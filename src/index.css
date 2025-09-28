@@ -1,0 +1,238 @@
+@import "tailwindcss";
+@layer 
+base
+ {
+  *, *::before, *::after {
+    
+box-sizing
+: border-box;
+  }
+
+  * {
+    
+margin
+: 0;
+    
+padding
+: 0;
+    
+box-sizing
+: border-box;
+  }
+
+  html {
+    
+font-family
+: sans-serif;
+    /* color: #333; */
+  }
+}
+
+* {
+  -webkit-user-select: none; /* Safari/Chrome */
+  -moz-user-select: none;    /* Firefox */
+  -ms-user-select: none;     /* Internet Explorer/Edge */
+  user-select: none;         /* Estándar */
+}
+
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Estilos para el mapa de Leaflet */
+.leaflet-container {
+  background: #1a1a1a !important;
+}
+
+.leaflet-tile {
+  filter: brightness(0.7) contrast(1.2) saturate(0.8);
+}
+
+.custom-job-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.custom-popup .leaflet-popup-content-wrapper {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  border: none;
+}
+
+.custom-popup .leaflet-popup-tip {
+  background: white;
+  border: none;
+  box-shadow: none;
+}
+
+.custom-popup .leaflet-popup-content {
+  margin: 0;
+  padding: 0;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Animación para el marcador de ubicación del usuario */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.1;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.custom-user-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  background: black;
+}
+
+:root {
+  --vh: 1vh;
+}
+
+#root {
+  height: calc(var(--vh, 1vh) * 100);
+  height: 100dvh; /* Soporte nativo para dynamic viewport */
+}
+
+/* Animación personalizada para el disco giratorio */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* Utilidad para truncar texto */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Safe area para dispositivos móviles - Mejorado */
+/* .pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.pt-safe {
+  padding-top: max(1rem, env(safe-area-inset-top));
+} */
+
+/* Estilo mejorado para la barra inferior móvil */
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    bottom: 0;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    /* Asegurar que esté por encima de la barra de navegación del dispositivo */
+    z-index: 9999 !important;
+    position: fixed !important;
+  }
+
+  /* Contenedor principal en móvil */
+  .mobile-main-container {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: calc(65px + env(safe-area-inset-bottom));
+    height: 100vh;
+    height: 100dvh; /* Dynamic viewport height */
+  }
+
+  /* Elementos que necesitan estar por encima de las safe areas */
+  .mobile-content-safe {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+    padding-bottom: calc(85px + max(0.5rem, env(safe-area-inset-bottom)));
+  }
+}
+
+/* Animación para el botón de favoritos */
+@keyframes bookmark-bounce {
+  0% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.3) rotate(-5deg); }
+  50% { transform: scale(1.4) rotate(5deg); }
+  75% { transform: scale(1.2) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.bookmark-animate {
+  animation: bookmark-bounce 0.6s ease-in-out;
+}
+
+/* Efecto de pulso para el estado activo */
+@keyframes bookmark-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.bookmark-active {
+  animation: bookmark-pulse 2s ease-in-out infinite;
+}
+
+
+
+/* ===== SCROLLBAR===== */
+.ultra-thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #FBB581 transparent;
+}
+
+.ultra-thin-scrollbar::-webkit-scrollbar {
+  width: 0.5px;
+}
+
+.ultra-thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ultra-thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #FBB581;
+  border-radius: 0px;
+  transition: all 0.2s ease;
+}
+
+.ultra-thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #ffcc99;
+  width: 1px; /* Se hace más ancho al hover */
+}
+
+.ultra-thin-scrollbar::-webkit-scrollbar-button {
+  display: none;
+}
+
+.ultra-thin-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}

@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Generador de Iconos PWA</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;margin:0}
+    body{padding:20px;background:#f6f7fb;color:#0f172a}
+    h1{font-size:20px;margin:0 0 8px}
+    .card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(16,24,40,0.06);max-width:980px}
+    .row{display:flex;gap:12px;align-items:center}
+    input[type=file]{padding:6px}
+    label{font-size:13px}
+    .preview{width:160px;height:160px;border-radius:8px;border:1px dashed #e6eef8;display:grid;place-items:center;background:#fff}
+    .sizes{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .btn{background:#0ea5a4;color:white;padding:8px 12px;border-radius:8px;border:0;cursor:pointer}
+    .btn.secondary{background:#64748b}
+    .list{margin-top:12px}
+    .item{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:#f8fafc}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .small{font-size:12px}
+    a.link{color:#0369a1;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Generador de Iconos para PWA</h1>
+    <p class="small">Carga un <strong>SVG</strong> y genera iconos cuadrados (PNG) centrados. Puedes elegir fondo sólido o transparente.</p>
+
+    <div class="row" style="margin-top:12px">
+      <div style="flex:1">
+        <label>Cargar SVG</label>
+        <input id="svgFile" type="file" accept="image/svg+xml">
+
+        <div class="controls">
+          <label class="small">Fondo: <input id="bgColor" type="color" value="#ffffff"></label>
+          <label class="small"><input id="transparentBg" type="checkbox"> Transparente</label>
+          <label class="small">Padding (%): <input id="padding" type="number" min="0" max="45" value="12" style="width:70px"></label>
+          <label class="small">Escala máxima (% del área): <input id="maxScale" type="number" min="10" max="100" value="96" style="width:70px"></label>
+        </div>
+
+        <div style="margin-top:12px">
+          <label class="small">Tamaños (px) — separados por comas:</label>
+          <input id="sizesInput" type="text" value="48,72,96,128,144,152,192,384,512" style="width:100%">
+        </div>
+
+        <div style="margin-top:12px">
+          <button id="generate" class="btn">Generar iconos</button>
+          <button id="downloadAll" class="btn secondary">Descargar todo (ZIP)</button>
+        </div>
+
+      </div>
+
+      <div style="width:180px">
+        <label>Previsualización</label>
+        <div class="preview" id="preview">
+          <span class="small">Sin SVG</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="list" id="outputList"></div>
+
+    <hr style="margin-top:16px;border:none;border-top:1px solid #eef2ff">
+    <p class="small">Consejos: el generador centra y escala el SVG para llenar el cuadro respetando el padding. Si tu SVG no tiene viewBox, conviene añadirlo.</p>
+  </div>
+
+  <!-- JSZip para zipper -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <script>
+    const fileInput = document.getElementById('svgFile');
+    const preview = document.getElementById('preview');
+    const bgColorInput = document.getElementById('bgColor');
+    const transparentBgInput = document.getElementById('transparentBg');
+    const paddingInput = document.getElementById('padding');
+    const sizesInput = document.getElementById('sizesInput');
+    const generateBtn = document.getElementById('generate');
+    const outputList = document.getElementById('outputList');
+    const downloadAllBtn = document.getElementById('downloadAll');
+    const maxScaleInput = document.getElementById('maxScale');
+
+    let svgText = null;
+
+    fileInput.addEventListener('change', async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      if (!f.type.includes('svg')) { alert('Por favor sube un archivo SVG.'); return; }
+      svgText = await f.text();
+      // show preview
+      const blob = new Blob([svgText], {type:'image/svg+xml'});
+      const url = URL.createObjectURL(blob);
+      preview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = url;
+      img.style.maxWidth = '100%';
+      img.style.maxHeight = '100%';
+      img.onload = () => { URL.revokeObjectURL(url); }
+      preview.appendChild(img);
+    });
+
+    function parseSizes(text){
+      return text.split(',').map(s=>parseInt(s.trim())).filter(n=>Number.isFinite(n) && n>0).sort((a,b)=>a-b);
+    }
+
+    // Render one size: returns dataURL PNG
+    async function renderPNG(size, options){
+      const {svg, bgColor, transparent, paddingPct, maxScalePct} = options;
+      const svgBlob = new Blob([svg], {type:'image/svg+xml;charset=utf-8'});
+      const url = URL.createObjectURL(svgBlob);
+      const img = await new Promise((res, rej) => {
+        const i = new Image();
+        i.onload = () => { res(i); URL.revokeObjectURL(url); };
+        i.onerror = (e) => { rej(e); };
+        i.src = url;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      if (!transparent) {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+      } else {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+      }
+
+      const padPx = Math.max(0, Math.min(0.45, paddingPct/100)) * size;
+      const maxDrawW = canvas.width - padPx*2;
+      const maxDrawH = canvas.height - padPx*2;
+
+      const sw = img.width;
+      const sh = img.height;
+      const intrinsicW = sw || Math.max(sw, sh) || 100;
+      const intrinsicH = sh || intrinsicW;
+
+      let scale = Math.min(maxDrawW / intrinsicW, maxDrawH / intrinsicH);
+      scale = scale * (Math.max(0.1, Math.min(1, maxScalePct/100)));
+
+      const drawW = intrinsicW * scale;
+      const drawH = intrinsicH * scale;
+      const dx = (canvas.width - drawW)/2;
+      const dy = (canvas.height - drawH)/2;
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, dx, dy, drawW, drawH);
+
+      return canvas.toDataURL('image/png');
+    }
+
+    async function generateAll(){
+      if (!svgText) { alert('Sube primero un SVG.'); return; }
+      const sizes = parseSizes(sizesInput.value);
+      if (!sizes.length){ alert('Introduce al menos un tamaño válido.'); return; }
+
+      outputList.innerHTML = '';
+      const bgColor = bgColorInput.value;
+      const transparent = transparentBgInput.checked;
+      const paddingPct = parseFloat(paddingInput.value) || 12;
+      const maxScalePct = parseFloat(maxScaleInput.value) || 96;
+
+      const options = { svg: svgText, bgColor, transparent, paddingPct, maxScalePct };
+
+      for (const s of sizes){
+        const container = document.createElement('div');
+        container.className = 'item';
+        container.innerHTML = `<div style="display:flex;gap:12px;align-items:center"><div style="width:56px;height:56px;background:#fff;border-radius:8px;display:grid;place-items:center;border:1px solid #eef"></div><div><div><strong>${s}×${s}</strong></div><div class="small">PNG</div></div></div><div style='display:flex;gap:8px;align-items:center'><a class='link' target='_blank'>Ver</a><a class='link' download>Descargar</a></div>`;
+        outputList.appendChild(container);
+        const viewLink = container.querySelector('a[target]');
+        const dlLink = container.querySelectorAll('a')[1];
+
+        try{
+          const dataUrl = await renderPNG(s, options);
+          const img = document.createElement('img');
+          img.src = dataUrl;
+          img.style.maxWidth='52px'; img.style.maxHeight='52px'; img.style.display='block'; img.style.borderRadius='6px';
+          container.querySelector('div').firstElementChild.replaceWith(img);
+
+          viewLink.href = dataUrl;
+          dlLink.href = dataUrl;
+          dlLink.download = `icon-${s}x${s}.png`;
+
+        }catch(err){
+          console.error('error generating',s,err);
+          container.querySelector('a[target]').textContent = 'Error';
+        }
+      }
+    }
+
+    generateBtn.addEventListener('click', generateAll);
+
+    downloadAllBtn.addEventListener('click', async () => {
+      if (!svgText) { alert('Sube primero un SVG.'); return; }
+      const sizes = parseSizes(sizesInput.value);
+      if (!sizes.length) { alert('Introduce al menos un tamaño válido.'); return; }
+
+      const bgColor = bgColorInput.value;
+      const transparent = transparentBgInput.checked;
+      const paddingPct = parseFloat(paddingInput.value) || 12;
+      const maxScalePct = parseFloat(maxScaleInput.value) || 96;
+      const options = { svg: svgText, bgColor, transparent, paddingPct, maxScalePct };
+
+      const zip = new JSZip();
+      const folder = zip.folder('icons');
+
+      for (const s of sizes){
+        try{
+          const dataUrl = await renderPNG(s, options);
+          const bin = dataURLToUint8Array(dataUrl);
+          folder.file(`icon-${s}x${s}.png`, bin, {binary:true});
+        }catch(e){ console.error(e); }
+      }
+
+      const manifestEntries = sizes.map(s=>({src:`icons/icon-${s}x${s}.png`,sizes:`${s}x${s}`,type:'image/png'}));
+      const manifest = {
+        name: "Mi PWA",
+        short_name: "PWA",
+        icons: manifestEntries,
+        start_url: ".",
+        display: "standalone"
+      };
+      folder.file('site.webmanifest', JSON.stringify(manifest, null, 2));
+
+      const content = await zip.generateAsync({type:'blob'});
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'pwa-icons.zip';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    function dataURLToUint8Array(dataURL){
+      const base64 = dataURL.split(',')[1];
+      const raw = atob(base64);
+      const arr = new Uint8Array(raw.length);
+      for (let i=0;i<raw.length;++i) arr[i]=raw.charCodeAt(i);
+      return arr;
+    }
+
+    sizesInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') generateAll(); });
+
+  </script>
+</body>
+</html>

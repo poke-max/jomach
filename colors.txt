@@ -1,0 +1,12 @@
+[#D361A5] rosa
+[#673AB7] vileta
+[#FBB581] naranja
+
+#FF4438
+#00A888
+#D361A5
+#673AB7
+#FBB581
+
+#1565C0
+#81D4FA
