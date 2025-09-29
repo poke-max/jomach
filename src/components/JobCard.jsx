@@ -23,13 +23,20 @@ const JobCard = ({
   processTags,
   onOpenImageViewer
 }) => {
-  const [imageUrl, setImageUrl] = useState(job.url);
+  const [imageUrl, setImageUrl] = useState('/job-background.webp');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadImage = async () => {
-      if (job.url && job.url.startsWith('gs://')) {
-        const downloadUrl = await storageService.convertGsUrlToDownloadUrl(job.url);
-        setImageUrl(downloadUrl);
+      if (job.url) {
+        setIsLoading(true);
+        if (job.url.startsWith('gs://')) {
+          const downloadUrl = await storageService.convertGsUrlToDownloadUrl(job.url);
+          setImageUrl(downloadUrl);
+        } else {
+          setImageUrl(job.url);
+        }
+        setIsLoading(false);
       }
     };
     
@@ -37,7 +44,7 @@ const JobCard = ({
   }, [job.url]);
 
   return (
-<div
+    <div
       key={job.id}
       className="absolute w-full md:pl-50 flex items-center justify-center md:bottom-0 pb-[calc(65px+env(safe-area-inset-bottom))] md:pb-0"
       style={{
@@ -54,10 +61,11 @@ const JobCard = ({
           <div 
             className="absolute inset-0"
             style={{
-              backgroundImage: `url(${imageUrl})`,
-              backgroundSize: 'cover',
+              backgroundImage: `url(${isLoading ? '/job-background.webp' : imageUrl})`,
+              backgroundSize: isLoading ? '100% 100%' : 'cover',
               backgroundPosition: 'center',
-              filter: 'blur(20px)'
+              filter: 'blur(20px)',
+              transition: 'background-image 0.3s ease-in-out'
             }}
           />
           
@@ -73,7 +81,7 @@ const JobCard = ({
             }}
             src={imageUrl}
             alt={job.ubication}
-            className="relative z-10 w-full h-auto max-w-full md:h-full md:w-auto md:object-contain object-contain md:rounded-2xl shadow-2xl cursor-pointer hover:opacity-90 transition-opacity"
+            className={`relative z-10 w-full md:min-w-full min-w-screen h-auto max-w-full md:h-full md:w-auto md:object-contain object-contain md:rounded-2xl shadow-2xl cursor-pointer hover:opacity-90 transition-opacity ${isLoading ? 'opacity-50' : 'opacity-100'}`}
             loading={Math.abs(index - currentIndex) <= 1 ? "eager" : "lazy"}
             onClick={(e) => {
               e.stopPropagation();
@@ -192,4 +200,3 @@ const JobCard = ({
 };
 
 export default JobCard;
-
