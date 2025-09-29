@@ -447,7 +447,7 @@ Atentamente,
                    !isNaN(coords.lat) &&
                    !isNaN(coords.lng);
 
-    console.log(`📍 Job ${job?.id} tiene ubicación válida:`, isValid, job?.ubication);
+    /* console.log(`📍 Job ${job?.id} tiene ubicación válida:`, isValid, job?.ubication); */
     return isValid;
   };
 

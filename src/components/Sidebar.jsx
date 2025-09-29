@@ -26,7 +26,7 @@ const Sidebar = ({ onOpenMap, onGoHome, onOpenPublish, onOpenFavorites, onOpenMe
       
       {/* Desktop Sidebar - Oculta en móvil */}
 
-<div className="hidden md:flex fixed top-0 bottom-0 w-50 bg-black border-white/10 backdrop-blur-sm border-r z-40 flex-col left-0">
+<div className="hidden md:flex fixed top-0 bottom-0 w-50 bg-black border-white/10 backdrop-blur-sm border-r z-130 flex-col left-0">
 
       {/* Header con logo y título centrados */}
       <div className="flex flex-row items-center justify-center gap-2 mt-8 px-4">

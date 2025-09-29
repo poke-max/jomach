@@ -323,7 +323,7 @@ const ProfileModal = ({
     <div className="fixed inset-0 bg-black/95 backdrop-blur-sm z-[90] overflow-hidden">
       <div className="h-full overflow-y-auto">
         <div className="min-h-full flex justify-center px-4 py-6">
-          <div className="w-full max-w-lg">
+          <div className="w-full md:pl-50">
             
             {/* Header */}
             <div className="text-center mb-6">

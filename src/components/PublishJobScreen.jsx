@@ -364,7 +364,7 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
   };
 
   return (
-<div className="fixed inset-0 bg-black overflow-hidden py-0 md:py-0 md:pl-50 z-[120]">
+<div className="fixed inset-0 bg-black overflow-hidden py-0 md:py-0 md:pl-50 z-[120] md:md-0 mb-20">
       <div className="h-full overflow-y-auto">
         <div className="min-h-full flex justify-center py-0 ">
           <div className="w-full ">

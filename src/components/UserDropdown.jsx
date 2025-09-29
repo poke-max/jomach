@@ -58,12 +58,12 @@ const UserDropdown = ({ isOpen, onClose, onOpenProfile, onOpenFavorites, onOpenM
   return (
     <>
       {/* Overlay */}
-      <div className="fixed bottom-0 inset-0 bg-black/20 z-[70]" onClick={onClose} />
+      <div className="fixed bottom-0 inset-0 bg-black/20 z-[200]" onClick={onClose} />
       
       {/* Dropdown */}
       <div 
         ref={dropdownRef}
-        className="fixed bottom-24 md:bottom-20 md:top-auto md:left-4 md:bottom-20 left-1/2 transform -translate-x-1/2 md:translate-x-0 bg-black/95 backdrop-blur-sm border border-white/10 rounded-2xl md:rounded-xl shadow-2xl z-[80] min-w-[280px] md:min-w-[220px] animate-in slide-in-from-bottom-4 duration-300"
+        className="fixed bottom-24 md:bottom-20 md:top-auto md:left-4 md:bottom-20 left-1/2 transform -translate-x-1/2 md:translate-x-0 bg-black/95 backdrop-blur-sm border border-white/10 rounded-2xl md:rounded-xl shadow-2xl z-[200] min-w-[280px] md:min-w-[220px] animate-in slide-in-from-bottom-4 duration-300"
       >
         {/* Header del usuario */}
         <div className="p-4 md:p-3 border-b border-white/10">
