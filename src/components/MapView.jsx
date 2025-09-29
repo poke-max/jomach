@@ -2,8 +2,23 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { FaBriefcase, FaDollarSign, FaMapMarkerAlt, FaLocationArrow, FaSearch, FaCrosshairs } from 'react-icons/fa';
+import { FaBriefcase, FaDollarSign, FaMapMarkerAlt, FaLocationArrow, FaSearch, FaCrosshairs, FaTimes } from 'react-icons/fa';
 import { storageService } from '../firebase/storageService';
+import JobModal from './JobModal';
+
+// Componente para manejar cambios dinámicos en el mapa
+const MapController = ({ selectedJobLocation }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (selectedJobLocation) {
+      console.log('🎯 MapController - Centrando en ubicación específica');
+      map.setView([selectedJobLocation.lat, selectedJobLocation.lng], 16);
+    }
+  }, [map, selectedJobLocation]);
+
+  return null;
+};
 
 // Fix para los iconos de Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -13,18 +28,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Componente para centrar el mapa en una ubicación específica
-const MapController = ({ center, zoom }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (center) {
-      map.setView(center, zoom || 13);
-    }
-  }, [map, center, zoom]);
-  
-  return null;
-};
+
 
 // Crear icono personalizado para los jobs
 const createJobIcon = () => {
@@ -113,15 +117,43 @@ const JobImage = ({ job }) => {
   );
 };
 
-const MapView = ({ jobs, onClose, selectedJobLocation = null }) => {
-  const [mapCenter, setMapCenter] = useState([-34.6037, -58.3816]); // Buenos Aires por defecto
-  const [mapZoom, setMapZoom] = useState(10);
+const MapView = ({
+  jobs,
+  bookmarks,
+  bookmarkAnimations,
+  showContactOptions,
+  onToggleBookmark,
+  onToggleContactOptions,
+  onOpenMapWithLocation,
+  hasValidLocation,
+  onEmailContact,
+  onWhatsAppContact,
+  onWebsiteContact,
+  onEditJob,
+  onDeleteJob,
+  onViewProfile,
+  onShareJob,
+  processTags,
+  onClose,
+  selectedJobLocation = null
+}) => {
+  const [mapCenter, setMapCenter] = useState([-23.4425, -58.4438]); // Paraguay por defecto
+  const [mapZoom, setMapZoom] = useState(6);
   const [userLocation, setUserLocation] = useState(null);
   const [locationError, setLocationError] = useState(null);
   const [imageUrls, setImageUrls] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
   const mapRef = useRef();
+  const mapInitialized = useRef(false);
+
+  // Filtrar empleos según el contexto:
+  // - Si hay selectedJobLocation, mostrar solo ese job específico
+  // - Si no, mostrar solo los empleos favoritos
+  const jobsToShow = selectedJobLocation && selectedJobLocation.job
+    ? [selectedJobLocation.job]
+    : (jobs ? jobs.filter(job => bookmarks && bookmarks[job.id]) : []);
 
   // Obtener ubicación del usuario
   useEffect(() => {
@@ -177,57 +209,68 @@ const MapView = ({ jobs, onClose, selectedJobLocation = null }) => {
     return null;
   };
 
+  // useEffect para manejar ubicación específica seleccionada
   useEffect(() => {
-    console.log('🗺️ MapView - Datos recibidos:');
-    console.log('📍 selectedJobLocation:', selectedJobLocation);
-    console.log('💼 jobs:', jobs);
-    console.log('📊 Total jobs:', jobs?.length);
-
-    // Si hay una ubicación específica seleccionada, centrar en ella
     if (selectedJobLocation) {
       console.log('🎯 Centrando mapa en ubicación específica:', selectedJobLocation);
-      setMapCenter([selectedJobLocation.lat, selectedJobLocation.lng]);
-      setMapZoom(15);
-    } else if (jobs && jobs.length > 0) {
-      // Calcular el centro basado en todos los jobs
-      console.log('🔍 Analizando ubicaciones de todos los jobs...');
+      // El MapController se encarga del zoom y centrado dinámico
+      mapInitialized.current = true; // Marcar como inicializado para evitar conflictos
+    }
+  }, [selectedJobLocation]);
 
-      const validJobs = jobs.filter(job => {
-        const coords = getCoordinatesFromGeoPoint(job.ubication);
-        const isValid = coords &&
-                       typeof coords.lat === 'number' &&
-                       typeof coords.lng === 'number';
+  // useEffect para inicializar el mapa solo una vez con favoritos
+  useEffect(() => {
+    if (!mapInitialized.current && jobs && jobs.length > 0 && bookmarks && !selectedJobLocation) {
+      console.log('🗺️ MapView - Inicializando mapa con jobs favoritos');
 
-        console.log(`📍 Job ${job.id}:`, {
-          ubication: job.ubication,
-          coords: coords,
-          isValid: isValid
+      const favoriteJobs = jobs.filter(job => bookmarks[job.id]);
+      console.log('💼 favoriteJobs:', favoriteJobs);
+      console.log('📊 Total favorite jobs:', favoriteJobs?.length);
+
+      if (favoriteJobs.length > 0) {
+        // Calcular el centro basado en todos los jobs favoritos
+        console.log('🔍 Analizando ubicaciones de todos los jobs favoritos...');
+
+        const validJobs = favoriteJobs.filter(job => {
+          const coords = getCoordinatesFromGeoPoint(job.ubication);
+          const isValid = coords &&
+                         typeof coords.lat === 'number' &&
+                         typeof coords.lng === 'number';
+
+          console.log(`📍 Job ${job.id}:`, {
+            ubication: job.ubication,
+            coords: coords,
+            isValid: isValid
+          });
+
+          return isValid;
         });
 
-        return isValid;
-      });
+        console.log(`✅ Jobs favoritos con ubicación válida: ${validJobs.length}/${favoriteJobs.length}`);
 
-      console.log(`✅ Jobs con ubicación válida: ${validJobs.length}/${jobs.length}`);
+        if (validJobs.length > 0) {
+          const avgLat = validJobs.reduce((sum, job) => {
+            const coords = getCoordinatesFromGeoPoint(job.ubication);
+            return sum + coords.lat;
+          }, 0) / validJobs.length;
 
-      if (validJobs.length > 0) {
-        const avgLat = validJobs.reduce((sum, job) => {
-          const coords = getCoordinatesFromGeoPoint(job.ubication);
-          return sum + coords.lat;
-        }, 0) / validJobs.length;
+          const avgLng = validJobs.reduce((sum, job) => {
+            const coords = getCoordinatesFromGeoPoint(job.ubication);
+            return sum + coords.lng;
+          }, 0) / validJobs.length;
 
-        const avgLng = validJobs.reduce((sum, job) => {
-          const coords = getCoordinatesFromGeoPoint(job.ubication);
-          return sum + coords.lng;
-        }, 0) / validJobs.length;
-
-        console.log('📍 Centro calculado:', { avgLat, avgLng });
-        setMapCenter([avgLat, avgLng]);
-        setMapZoom(12);
-      } else {
-        console.log('⚠️ No se encontraron jobs con ubicación válida, usando centro por defecto');
+          console.log('📍 Centro calculado:', { avgLat, avgLng });
+          setMapCenter([avgLat, avgLng]);
+          // Mantener el zoom inicial cuando no hay ubicación específica
+          // setMapZoom(12); // Comentado para mantener el zoom inicial
+        } else {
+          console.log('⚠️ No se encontraron jobs favoritos con ubicación válida, usando centro por defecto');
+        }
       }
+
+      mapInitialized.current = true;
     }
-  }, [jobs, selectedJobLocation]);
+  }, [jobs, bookmarks]);
 
   // Función para centrar el mapa en la ubicación del usuario
   const centerOnUserLocation = () => {
@@ -281,7 +324,14 @@ const MapView = ({ jobs, onClose, selectedJobLocation = null }) => {
 
   return (
     <>
-      <div className="fixed inset-0 z-10 bg-black">
+      <div className="fixed inset-0 z-10 bg-black md:pl-50">
+        {/* Botón de cerrar */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-30 bg-black/50 hover:bg-black/70 text-white p-3 rounded-full transition-all duration-200"
+        >
+          <FaTimes className="w-5 h-5" />
+        </button>
 
         {/* Contenedor del mapa */}
         <div className="w-full h-full">
@@ -296,11 +346,12 @@ const MapView = ({ jobs, onClose, selectedJobLocation = null }) => {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            
-            <MapController center={mapCenter} zoom={mapZoom} />
-            
+
+            {/* Controlador para manejar cambios dinámicos */}
+            <MapController selectedJobLocation={selectedJobLocation} />
+
             {/* Marcadores de empleos */}
-            {jobs && jobs.map((job) => {
+            {jobsToShow && jobsToShow.map((job) => {
               // Si hay un job específico seleccionado, mostrar solo ese
               if (selectedJobLocation && selectedJobLocation.job && job.id !== selectedJobLocation.job.id) {
                 return null;
@@ -364,7 +415,10 @@ const MapView = ({ jobs, onClose, selectedJobLocation = null }) => {
                       )}
                       
                       {/* Botón de acción */}
-                      <button className="w-full mt-3 bg-[#FBB581] hover:bg-[#FBB581] text-white py-2 px-4 rounded-lg transition-colors duration-200">
+                      <button
+                        onClick={() => setSelectedJob(job)}
+                        className="w-full mt-3 bg-[#FBB581] hover:bg-[#FBB581] text-white py-2 px-4 rounded-lg transition-colors duration-200"
+                      >
                         Ver detalles
                       </button>
                     </div>
@@ -421,10 +475,10 @@ const MapView = ({ jobs, onClose, selectedJobLocation = null }) => {
           {selectedJobLocation && selectedJobLocation.job ? (
             `${selectedJobLocation.job.title}`
           ) : (
-            `${jobs ? jobs.filter(job => {
+            `${jobsToShow ? jobsToShow.filter(job => {
               const coords = getCoordinatesFromGeoPoint(job.ubication);
               return coords && typeof coords.lat === 'number' && typeof coords.lng === 'number';
-            }).length : 0} empleos disponibles`
+            }).length : 0} ${selectedJobLocation ? 'empleo seleccionado' : 'favoritos disponibles'}`
           )}
         </span>
       </button>
@@ -500,6 +554,28 @@ const MapView = ({ jobs, onClose, selectedJobLocation = null }) => {
         >
           <FaCrosshairs className="w-5 h-5" />
         </button>
+
+      {/* Job Modal */}
+      <JobModal
+        job={selectedJob}
+        isOpen={!!selectedJob}
+        onClose={() => setSelectedJob(null)}
+        bookmarks={bookmarks}
+        bookmarkAnimations={bookmarkAnimations}
+        showContactOptions={showContactOptions}
+        onToggleBookmark={onToggleBookmark}
+        onToggleContactOptions={onToggleContactOptions}
+        onOpenMapWithLocation={onOpenMapWithLocation}
+        hasValidLocation={hasValidLocation}
+        onEmailContact={onEmailContact}
+        onWhatsAppContact={onWhatsAppContact}
+        onWebsiteContact={onWebsiteContact}
+        onEditJob={onEditJob}
+        onDeleteJob={onDeleteJob}
+        onViewProfile={onViewProfile}
+        onShareJob={onShareJob}
+        processTags={processTags}
+      />
     </>
   );
 };

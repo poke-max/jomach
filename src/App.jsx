@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { FaSearch } from 'react-icons/fa';
 import Sidebar from './components/Sidebar';
 import LoginScreen from './components/LoginScreen';
 import MapView from './components/MapView';
@@ -6,18 +7,69 @@ import DebugPanel from './components/DebugPanel';
 import InstallPWA from './components/InstallPWA';
 import LoadingScreen from './components/LoadingScreen';
 import JobCard from './components/JobCard';
+import JobModal from './components/JobModal';
 import ProfileModal from './components/ProfileModal';
 import PublishJobScreen from './components/PublishJobScreen';
 import FavoriteJobs from './components/FavoriteJobs';
+
+import ConversationsScreen from './components/ConversationsScreen';
+import NotificationPermission from './components/NotificationPermission';
+import ImageViewer from './components/ImageViewer';
 import { useAuth } from './contexts/AuthContext';
 import { useJobs } from './hooks/UseJobs';
 import { useSmoothJobNavigation } from './hooks/useSmoothJobNavigation';
 import { useJobInteractions } from './hooks/useJobInteractions';
+import { useUnreadMessages } from './hooks/useUnreadMessages';
 import { jobsService } from './firebase/services';
 
 const App = () => {
   const { currentUser, userProfile, loading } = useAuth();
   const { jobs, loading: jobsLoading, error: jobsError } = useJobs();
+  const { notificationsEnabled, requestNotificationPermission } = useUnreadMessages();
+
+  // Estado para búsqueda integrada
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Función para normalizar texto (copiada de SearchScreen)
+  const normalizeText = (text) => {
+    if (!text) return '';
+    return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  };
+
+  // Función de búsqueda inteligente (copiada de SearchScreen)
+  const searchInAllFields = (job, searchTerms) => {
+    // Campos donde buscar
+    const searchFields = [
+      job.city,
+      job.company,
+      job.description,
+      job.direction,
+      job.position,
+      job.title,
+      job.type,
+      job.tags
+    ];
+
+    // Normalizar todos los campos y unirlos en un solo texto
+    const allFieldsText = searchFields
+      .filter(field => field) // Filtrar campos vacíos/null
+      .map(field => normalizeText(field.toString()))
+      .join(' ');
+
+    // Verificar que todos los términos de búsqueda estén presentes
+    return searchTerms.every(term =>
+      allFieldsText.includes(normalizeText(term))
+    );
+  };
+
+  // Filtrar trabajos con búsqueda inteligente
+  const filteredJobs = searchTerm.trim()
+    ? jobs.filter(job => {
+        // Dividir el término de búsqueda en palabras individuales
+        const searchTerms = searchTerm.trim().split(/\s+/);
+        return searchInAllFields(job, searchTerms);
+      })
+    : jobs; // Si no hay término de búsqueda, mostrar todos los jobs
 
   // Usar hooks personalizados
   const {
@@ -34,7 +86,7 @@ const App = () => {
     goToNext,
     goToPrev,
     goToIndex
-  } = useSmoothJobNavigation(jobs);
+  } = useSmoothJobNavigation(filteredJobs);
 
   const {
     likes,
@@ -66,7 +118,25 @@ Atentamente,
   const [profileUserId, setProfileUserId] = useState(null);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
+  const [selectedJobFromProfile, setSelectedJobFromProfile] = useState(null);
   const [showFavorites, setShowFavorites] = useState(false);
+
+  const [showMessages, setShowMessages] = useState(false);
+  const [selectedChatUser, setSelectedChatUser] = useState(null);
+  const [showNotificationBanner, setShowNotificationBanner] = useState(false);
+
+
+
+  // Resetear índice cuando cambie la búsqueda
+  useEffect(() => {
+    if (setCurrentIndex) {
+      setCurrentIndex(0);
+    }
+  }, [searchTerm, setCurrentIndex]);
+  
+  // Estado centralizado del ImageViewer
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [imageViewerData, setImageViewerData] = useState({ url: '', alt: '' });
 
   // Función para procesar los tags
   const processTags = (tagsString) => {
@@ -128,6 +198,12 @@ Atentamente,
     setProfileUserId(null);
   };
 
+  // Función para ver job desde perfil
+  const handleViewJobFromProfile = (job) => {
+    setSelectedJobFromProfile(job);
+    setShowProfileModal(false); // Cerrar modal de perfil
+  };
+
   // Función para cerrar modal de publicación
   const handleClosePublishModal = () => {
     setShowPublishModal(false);
@@ -183,23 +259,32 @@ Atentamente,
     setShowMap(false);
     setSelectedJobLocation(null);
     setCurrentView('home');
-    setShowPublishModal(false); // Cerrar modal de publicar
-    setShowFavorites(false); // Cerrar favoritos
+    setShowPublishModal(false);
+    setShowFavorites(false);
+
+    setShowMessages(false); // Cerrar mensajes
+    setSelectedChatUser(null);
   };
 
   const openMap = () => {
     setShowMap(true);
     setCurrentView('map');
-    setShowFavorites(false); // Cerrar favoritos
-    setShowPublishModal(false); // Cerrar modal de publicar
+    setShowFavorites(false);
+    setShowPublishModal(false);
+
+    setShowMessages(false); // Cerrar mensajes
+    setSelectedChatUser(null);
   };
 
   const openPublish = () => {
     setShowPublishModal(true);
     setCurrentView('publish');
-    setShowFavorites(false); // Cerrar favoritos
-    setShowMap(false); // Cerrar mapa
+    setShowFavorites(false);
+    setShowMap(false);
     setSelectedJobLocation(null);
+
+    setShowMessages(false); // Cerrar mensajes
+    setSelectedChatUser(null);
   };
 
   const closePublish = () => {
@@ -210,14 +295,49 @@ Atentamente,
   const openFavorites = () => {
     setShowFavorites(true);
     setCurrentView('favorites');
-    setShowPublishModal(false); // Cerrar modal de publicar
-    setShowMap(false); // Cerrar mapa
+    setShowPublishModal(false);
+    setShowMap(false);
     setSelectedJobLocation(null);
+
+    setShowMessages(false); // Cerrar mensajes
+    setSelectedChatUser(null);
   };
 
   const closeFavorites = () => {
     setShowFavorites(false);
     setCurrentView('home');
+  };
+
+
+
+  const openMessages = () => {
+    setShowMessages(true);
+    setCurrentView('messages');
+    setShowPublishModal(false);
+    setShowMap(false);
+    setShowFavorites(false);
+
+    setSelectedJobLocation(null);
+
+    // Mostrar banner de notificaciones si no están habilitadas y no se ha descartado permanentemente
+    const permanentlyDismissed = localStorage.getItem('notifications-permanently-dismissed') === 'true';
+    if (!notificationsEnabled && !permanentlyDismissed) {
+      setShowNotificationBanner(true);
+    }
+  };
+
+  const closeMessages = () => {
+    setShowMessages(false);
+    setSelectedChatUser(null);
+    setCurrentView('home');
+    setShowNotificationBanner(false); // Cerrar banner al cerrar mensajes
+  };
+
+  const handleNotificationBannerClose = (activated) => {
+    setShowNotificationBanner(false);
+    if (activated) {
+      console.log('✅ Notificaciones activadas exitosamente');
+    }
   };
 
   const handleJobPublished = (newJobId = null) => {
@@ -334,6 +454,27 @@ Atentamente,
     }
   };
 
+  // Función para manejar envío de mensajes
+  const handleSendMessage = (recipientId, recipientName) => {
+    console.log('Enviar mensaje a:', recipientId, recipientName);
+    setSelectedChatUser({ recipientId, recipientName });
+    openMessages();
+  };
+
+
+
+  // Función para abrir el ImageViewer centralizado
+  const handleOpenImageViewer = (imageUrl, alt, imgElement = null) => {
+    setImageViewerData({ url: imageUrl, alt: alt, imgElement: imgElement });
+    setShowImageViewer(true);
+  };
+
+  // Función para cerrar el ImageViewer
+  const handleCloseImageViewer = () => {
+    setShowImageViewer(false);
+    setImageViewerData({ url: '', alt: '' });
+  };
+
   return (
     <div className="w-screen h-screen bg-black overflow-hidden relative"
          style={{
@@ -349,6 +490,7 @@ Atentamente,
         onGoHome={goHome}
         onOpenPublish={openPublish}
         onOpenFavorites={openFavorites}
+        onOpenMessages={openMessages}
         currentView={currentView}
       />
 
@@ -378,23 +520,89 @@ Atentamente,
           perspective: '1000px'
         }}
       >
+        {/* Barra de búsqueda móvil - Funcional */}
+        {currentView === 'home' && (
+          <div className="md:hidden absolute top-0 left-0 right-0 z-50 p-3"
+               style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}>
+            <div className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg">
+              <div className="flex items-center">
+                <FaSearch className="absolute left-3 text-white/40 text-sm" />
+                <input
+                  type="text"
+                  placeholder="Buscar empleos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-3 py-3 bg-transparent text-white placeholder-white/60 focus:outline-none text-sm"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 text-white/40 hover:text-white"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Barra de búsqueda desktop - Funcional */}
+        {currentView === 'home' && (
+          <div className="hidden md:block absolute pl-50 py-4 top-0 left-0 right-0 z-50">
+            <div className="max-w-md p-6 mx-auto">
+              <div className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg">
+                <div className="flex items-center">
+                  <FaSearch className="absolute left-3 text-white/40 text-sm" />
+                  <input
+                    type="text"
+                    placeholder="Buscar empleos..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-3 py-3 bg-transparent text-white placeholder-white/60 focus:outline-none focus:border-[#FBB581] text-sm"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 text-white/40 hover:text-white"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Mostrar mensaje si no hay empleos */}
         {(!jobs || jobs.length === 0) ? (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="w-full md:pl-50 h-full flex items-center justify-center">
             <div className="text-white text-xl">No hay empleos disponibles</div>
+          </div>
+        ) : filteredJobs.length === 0 && searchTerm.trim() ? (
+          /* Mensaje cuando no hay resultados de búsqueda */
+          <div className="w-full md:pl-50 h-full flex items-center justify-center">
+            <div className="text-center">
+              <FaSearch className="text-white/30 text-3xl mb-3 mx-auto" />
+              <div className="text-white text-lg mb-2">No se encontraron empleos</div>
+              <div className="text-white/60 text-sm">
+                Intenta con otros términos de búsqueda
+              </div>
+            </div>
           </div>
         ) : (
           /* Contenedor de empleos existente */
-          <div 
+          <div
             className="relative w-full h-full"
-            style={{ 
+            style={{
               transform: `translateY(${(-currentIndex * 100) + (dragOffset / window.innerHeight * 100)}vh)`,
               willChange: 'transform',
               transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
               backfaceVisibility: 'hidden'
             }}
           >
-            {jobs.map((job, index) => (
+            {filteredJobs.map((job, index) => (
               <JobCard
                 key={job.id}
                 job={job}
@@ -414,6 +622,7 @@ Atentamente,
                 onDeleteJob={handleDeleteJob}
                 onViewProfile={handleViewProfile}
                 onShareJob={handleShareJob}
+                onOpenImageViewer={handleOpenImageViewer}
                 processTags={processTags}
               />
             ))}
@@ -425,6 +634,21 @@ Atentamente,
       {showMap && (
         <MapView
           jobs={selectedJobLocation && selectedJobLocation.job ? [selectedJobLocation.job] : jobs}
+          bookmarks={bookmarks}
+          bookmarkAnimations={bookmarkAnimations}
+          showContactOptions={showContactOptions}
+          onToggleBookmark={toggleBookmark}
+          onToggleContactOptions={toggleContactOptions}
+          onOpenMapWithLocation={openMapWithLocation}
+          hasValidLocation={hasValidLocation}
+          onEmailContact={handleEmailContact}
+          onWhatsAppContact={handleWhatsAppContact}
+          onWebsiteContact={handleWebsiteContact}
+          onEditJob={handleEditJob}
+          onDeleteJob={handleDeleteJob}
+          onViewProfile={handleViewProfile}
+          onShareJob={handleShareJob}
+          processTags={processTags}
           onClose={() => {
             setShowMap(false);
             setSelectedJobLocation(null);
@@ -441,11 +665,14 @@ Atentamente,
         setDefaultMessage={setDefaultMessage}
         userId={profileUserId}
         onEditJob={handleEditJob}
+        onSendMessage={handleSendMessage}
+        onViewJob={handleViewJobFromProfile}
       />
 
       {/* PWA Install Button */}
       <InstallPWA />
 
+      <div className="text-center bg-black mb-6">
       {/* Modal de publicar empleo */}
       {showPublishModal && (
         <PublishJobScreen
@@ -457,6 +684,7 @@ Atentamente,
           editingJob={editingJob}
         />
       )}
+      </div>
 
       {/* Pantalla de favoritos */}
       {showFavorites && (
@@ -480,8 +708,61 @@ Atentamente,
           onClose={closeFavorites}
         />
       )}
+
+
+
+      {/* Pantalla de mensajes */}
+      {showMessages && (
+        <ConversationsScreen
+          onClose={closeMessages}
+          selectedChatUser={selectedChatUser}
+        />
+      )}
+
+      {/* Banner de permisos de notificación */}
+      {currentUser && (
+        <NotificationPermission
+          notificationsEnabled={notificationsEnabled}
+          onRequestPermission={requestNotificationPermission}
+          show={showNotificationBanner}
+          onClose={handleNotificationBannerClose}
+        />
+      )}
+
+      {/* Job Modal desde perfil */}
+      <JobModal
+        job={selectedJobFromProfile}
+        isOpen={!!selectedJobFromProfile}
+        onClose={() => setSelectedJobFromProfile(null)}
+        bookmarks={bookmarks}
+        bookmarkAnimations={bookmarkAnimations}
+        showContactOptions={showContactOptions}
+        onToggleBookmark={toggleBookmark}
+        onToggleContactOptions={toggleContactOptions}
+        onOpenMapWithLocation={openMapWithLocation}
+        hasValidLocation={hasValidLocation}
+        onEmailContact={handleEmailContact}
+        onWhatsAppContact={handleWhatsAppContact}
+        onWebsiteContact={handleWebsiteContact}
+        onEditJob={handleEditJob}
+        onDeleteJob={handleDeleteJob}
+        onViewProfile={handleViewProfile}
+        onShareJob={handleShareJob}
+        processTags={processTags}
+      />
+
+      {/* ImageViewer centralizado con z-index máximo */}
+      <ImageViewer
+        imageUrl={imageViewerData.url}
+        alt={imageViewerData.alt}
+        isOpen={showImageViewer}
+        onClose={handleCloseImageViewer}
+      />
     </div>
   );
 };
 
 export default App;
+
+
+

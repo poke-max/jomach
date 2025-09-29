@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useUnreadMessages } from '../hooks/useUnreadMessages';
 import UserAvatar from './UserAvatar';
-import { FaUser, FaCog, FaSignOutAlt } from 'react-icons/fa';
+import { FaUser, FaCog, FaSignOutAlt, FaBookmark, FaComments } from 'react-icons/fa';
 
-const UserDropdown = ({ isOpen, onClose, onOpenProfile }) => {
+const UserDropdown = ({ isOpen, onClose, onOpenProfile, onOpenFavorites, onOpenMessages }) => {
   const { currentUser, userProfile, logout } = useAuth();
+  const { unreadCount } = useUnreadMessages();
   const dropdownRef = useRef(null);
 
   // Cerrar dropdown al hacer click fuera
@@ -38,6 +40,16 @@ const UserDropdown = ({ isOpen, onClose, onOpenProfile }) => {
     onClose();
   };
 
+  const handleOpenFavorites = () => {
+    onOpenFavorites();
+    onClose();
+  };
+
+  const handleOpenMessages = () => {
+    onOpenMessages();
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   const displayName = userProfile?.displayName || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Usuario';
@@ -51,7 +63,7 @@ const UserDropdown = ({ isOpen, onClose, onOpenProfile }) => {
       {/* Dropdown */}
       <div 
         ref={dropdownRef}
-        className="fixed bottom-24 md:bottom-20 md:top-auto md:left-4 md:bottom-20 left-1/2 transform -translate-x-1/2 md:translate-x-0 bg-gray-900/95 border border-white/10 rounded-2xl md:rounded-xl shadow-2xl z-[80] min-w-[280px] md:min-w-[220px] animate-in slide-in-from-bottom-4 duration-300"
+        className="fixed bottom-24 md:bottom-20 md:top-auto md:left-4 md:bottom-20 left-1/2 transform -translate-x-1/2 md:translate-x-0 bg-black/95 backdrop-blur-sm border border-white/10 rounded-2xl md:rounded-xl shadow-2xl z-[80] min-w-[280px] md:min-w-[220px] animate-in slide-in-from-bottom-4 duration-300"
       >
         {/* Header del usuario */}
         <div className="p-4 md:p-3 border-b border-white/10">
@@ -81,6 +93,31 @@ const UserDropdown = ({ isOpen, onClose, onOpenProfile }) => {
           >
             <FaUser className="md:text-sm" />
             <span className="text-sm md:text-xs font-medium">Mi perfil</span>
+          </button>
+
+          {/* Mensajes */}
+          <button
+            onClick={handleOpenMessages}
+            className="w-full flex items-center gap-3 md:gap-2 p-3 md:p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl md:rounded-lg transition-all duration-200"
+          >
+            <div className="relative">
+              <FaComments className="md:text-sm" />
+              {unreadCount > 0 && (
+                <div className="absolute -top-2 -right-2 bg-[#FF4438] text-white text-xs rounded-full min-w-[16px] h-[16px] flex items-center justify-center font-bold shadow-lg">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </div>
+              )}
+            </div>
+            <span className="text-sm md:text-xs font-medium">Mensajes</span>
+          </button>
+
+          {/* Favoritos */}
+          <button
+            onClick={handleOpenFavorites}
+            className="w-full flex items-center gap-3 md:gap-2 p-3 md:p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-xl md:rounded-lg transition-all duration-200"
+          >
+            <FaBookmark className="md:text-sm" />
+            <span className="text-sm md:text-xs font-medium">Favoritos</span>
           </button>
 
           <button

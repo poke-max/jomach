@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { FaTimes, FaSearch, FaMapMarkerAlt, FaHashtag, FaUser } from 'react-icons/fa';
 import JobImage from './JobImage';
+import JobModal from './JobModal';
+import { useJobs } from '../hooks/UseJobs';
 
-const SearchScreen = ({ 
-  jobs, 
-  bookmarks, 
+const SearchScreen = ({
+  onClose,
+  onJobSelect,
+  bookmarks,
   bookmarkAnimations,
   showContactOptions,
   onToggleBookmark,
@@ -18,239 +21,328 @@ const SearchScreen = ({
   onDeleteJob,
   onViewProfile,
   onShareJob,
-  processTags,
-  onClose,
-  onJobSelect
+  processTags
 }) => {
   // Estados para búsqueda
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchType, setSearchType] = useState('all'); // 'all', 'name', 'city', 'tags'
   const [selectedJob, setSelectedJob] = useState(null);
   
-  // Función para normalizar texto para búsqueda (sin acentos y en minúsculas)
+  // Usar el hook useJobs para obtener los empleos
+  const { jobs, loading, error } = useJobs();
+
+  // Manejar selección de job
+  const handleJobSelect = (job) => {
+    setSelectedJob(job);
+  };
+
+  console.log('🔍 SearchScreen - Jobs obtenidos:', jobs.length, jobs);
+
+  // Función para normalizar texto
   const normalizeText = (text) => {
     if (!text) return '';
-    return text.toString().toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
+    return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   };
 
-  // Filtrar trabajos por término de búsqueda y tipo
+  // Función de búsqueda inteligente
+  const searchInAllFields = (job, searchTerms) => {
+    // Campos donde buscar
+    const searchFields = [
+      job.city,
+      job.company,
+      job.description,
+      job.direction,
+      job.position,
+      job.title,
+      job.type,
+      job.tags
+    ];
+
+    // Normalizar todos los campos y unirlos en un solo texto
+    const allFieldsText = searchFields
+      .filter(field => field) // Filtrar campos vacíos/null
+      .map(field => normalizeText(field.toString()))
+      .join(' ');
+
+    // Verificar que todos los términos de búsqueda estén presentes
+    return searchTerms.every(term => 
+      allFieldsText.includes(normalizeText(term))
+    );
+  };
+
+  // Filtrar trabajos con búsqueda inteligente
   const filteredJobs = jobs.filter(job => {
-    if (!searchTerm.trim()) return true;
+    if (!searchTerm.trim()) return false; // Solo mostrar resultados cuando hay búsqueda
+
+    // Dividir el término de búsqueda en palabras individuales
+    const searchTerms = searchTerm.trim().split(/\s+/);
     
-    const normalizedSearch = normalizeText(searchTerm);
-    
-    // Buscar en el título/nombre
-    const titleMatch = normalizeText(job.title).includes(normalizedSearch);
-    const companyMatch = normalizeText(job.company).includes(normalizedSearch);
-    const positionMatch = normalizeText(job.position).includes(normalizedSearch);
-    
-    // Buscar en ciudad
-    const cityMatch = normalizeText(job.city).includes(normalizedSearch);
-    
-    // Buscar en tags
-    let tagsMatch = false;
-    if (job.tags) {
-      const jobTags = processTags(job.tags);
-      tagsMatch = jobTags.some(tag => normalizeText(tag).includes(normalizedSearch));
-    }
-    
-    // Aplicar filtro según el tipo de búsqueda
-    switch (searchType) {
-      case 'name':
-        return titleMatch || companyMatch || positionMatch;
-      case 'city':
-        return cityMatch;
-      case 'tags':
-        return tagsMatch;
-      case 'all':
-      default:
-        return titleMatch || companyMatch || positionMatch || cityMatch || tagsMatch;
-    }
+    return searchInAllFields(job, searchTerms);
   });
 
-  // Función para manejar selección de trabajo
-  const handleJobSelect = (job) => {
-    if (onJobSelect) {
-      onJobSelect(job);
-    }
-    onClose();
-  };
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-40 bg-black flex items-center justify-center"
+           style={{ paddingBottom: 'calc(65px + env(safe-area-inset-bottom))' }}>
+        <div className="text-white text-sm">Cargando empleos...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="fixed inset-0 z-40 bg-black flex items-center justify-center"
+           style={{ paddingBottom: 'calc(65px + env(safe-area-inset-bottom))' }}>
+        <div className="text-red-400 text-sm">Error al cargar empleos: {error}</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="fixed inset-0 bg-black/95 backdrop-blur-sm z-[70] overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10">
-        <h2 className="text-white text-lg font-semibold">Buscar Empleos</h2>
-        <button
-          onClick={onClose}
-          className="w-8 h-8 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all"
-        >
-          <FaTimes className="text-sm" />
-        </button>
+    <>
+      {/* Mobile: pantalla completa con blur de fondo */}
+      <div className="md:hidden fixed inset-0 z-30 bg-black/50 backdrop-blur-md"
+           style={{ paddingBottom: 'calc(65px + env(safe-area-inset-bottom))' }}>
+        <div className="h-full flex flex-col">
+          {/* Barra de búsqueda en la misma posición que home */}
+          <div className="absolute top-0 left-0 right-0 z-50 p-3"
+               style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}>
+            <div className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg">
+              <div className="flex items-center">
+                <FaSearch className="absolute left-3 text-white/40 text-sm" />
+                <input
+                  type="text"
+                  placeholder="Buscar empleos... ej: Buenos Aires ingeniero"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-10 py-3 bg-transparent text-white placeholder-white/60 focus:outline-none text-sm"
+                  autoFocus
+                />
+                <button
+                  onClick={onClose}
+                  className="absolute right-3 text-white/60 hover:text-white"
+                >
+                  <FaTimes className="text-sm" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Resultados Mobile - con padding top para no solapar con la barra */}
+          <div className="flex-1 overflow-y-auto"
+               style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}>
+            {!searchTerm.trim() ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                <FaSearch className="text-white/30 text-3xl mb-3" />
+                <h3 className="text-white/60 text-sm font-medium mb-2">
+                  Busca empleos
+                </h3>
+                <p className="text-white/40 text-xs mb-2">
+                  Escribe palabras clave para buscar empleos
+                </p>
+                <p className="text-white/30 text-xs">
+                  Ejemplo: "Buenos Aires ingeniero", "remoto desarrollador"
+                </p>
+                <p className="text-white/60 text-xs mt-3">
+                  Total de empleos disponibles: {jobs.length}
+                </p>
+              </div>
+            ) : filteredJobs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                <FaSearch className="text-white/30 text-3xl mb-3" />
+                <h3 className="text-white/60 text-sm font-medium mb-2">
+                  Sin resultados
+                </h3>
+                <p className="text-white/40 text-xs">
+                  No se encontraron empleos que coincidan con "{searchTerm}"
+                </p>
+                <p className="text-white/30 text-xs mt-2">
+                  Intenta con otras palabras clave
+                </p>
+              </div>
+            ) : (
+              <div className="p-3 space-y-2">
+                <p className="text-white/60 text-xs mb-3">
+                  {filteredJobs.length} resultado{filteredJobs.length !== 1 ? 's' : ''} para "{searchTerm}"
+                </p>
+                {filteredJobs.map((job) => (
+                  <div
+                    key={job.id}
+                    onClick={() => handleJobSelect(job)}
+                    className="flex items-center gap-3 p-3 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10 hover:bg-white/10 transition-all cursor-pointer"
+                  >
+                    <div className="relative flex-shrink-0">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden">
+                        <JobImage
+                          job={job}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-white font-medium text-sm truncate">
+                        {job.title}
+                      </h3>
+                      <p className="text-white/60 text-xs truncate">
+                        {job.company}
+                      </p>
+                      <p className="text-white/40 text-xs truncate">
+                        {job.city || job.direction}
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-[#FBB581] text-xs font-medium">
+                        ${job.salary?.toLocaleString() || 'No especificado'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Buscador */}
-      <div className="p-4 border-b border-white/10 space-y-3">
-        <div className="relative">
-          <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 text-sm" />
-          <input
-            type="text"
-            placeholder="Buscar empleos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-white/50 text-sm focus:outline-none focus:border-[#FBB581]/50 focus:bg-white/15 transition-all"
-            autoFocus
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/40 hover:text-white transition-colors"
-            >
-              <FaTimes className="text-sm" />
-            </button>
+      {/* Desktop: panel lateral que no cubra el sidebar */}
+      <div className="hidden md:flex fixed right-0 top-0 bottom-0 bg-black z-30 overflow-hidden flex-col"
+           style={{
+             width: 'calc(100vw - 200px)',
+             left: '200px'
+           }}>
+        {/* Header Desktop */}
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <FaSearch className="text-white text-sm" />
+            <h2 className="text-white text-lg font-semibold">Buscar</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white/60 hover:text-white p-1"
+          >
+            <FaTimes className="text-lg" />
+          </button>
+        </div>
+
+        {/* Filtros Desktop */}
+        <div className="p-4 border-b border-white/10">
+          <div className="relative">
+            <FaSearch className="absolute left-2 top-1/2 transform -translate-y-1/2 text-white/40 text-xs" />
+            <input
+              type="text"
+              placeholder="Buscar empleos... ej: Buenos Aires ingeniero"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-7 pr-3 py-1.5 bg-white/10 border border-white/20 rounded-md text-white placeholder-white/40 focus:outline-none focus:border-[#FBB581] text-sm"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-white/40 hover:text-white"
+              >
+                <FaTimes className="text-xs" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Resultados Desktop */}
+        <div className="flex-1 overflow-y-auto">
+          {!searchTerm.trim() ? (
+            <div className="flex flex-col items-center justify-center h-full text-center p-8">
+              <FaSearch className="text-white/30 text-3xl mb-3" />
+              <h3 className="text-white/60 text-sm font-medium mb-2">
+                Busca empleos
+              </h3>
+              <p className="text-white/40 text-xs mb-2">
+                Escribe palabras clave para buscar empleos
+              </p>
+              <p className="text-white/30 text-xs">
+                Ejemplo: "Buenos Aires ingeniero", "remoto desarrollador"
+              </p>
+              <p className="text-white/60 text-xs mt-3">
+                Total de empleos disponibles: {jobs.length}
+              </p>
+            </div>
+          ) : filteredJobs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center p-8">
+              <FaSearch className="text-white/30 text-3xl mb-3" />
+              <h3 className="text-white/60 text-sm font-medium mb-2">
+                Sin resultados
+              </h3>
+              <p className="text-white/40 text-xs">
+                No se encontraron empleos que coincidan con "{searchTerm}"
+              </p>
+              <p className="text-white/30 text-xs mt-2">
+                Intenta con otras palabras clave
+              </p>
+            </div>
+          ) : (
+            <div className="p-4 space-y-2">
+              <p className="text-white/60 text-xs mb-3">
+                {filteredJobs.length} resultado{filteredJobs.length !== 1 ? 's' : ''} para "{searchTerm}"
+              </p>
+              {filteredJobs.map((job) => (
+                <div
+                  key={job.id}
+                  onClick={() => handleJobSelect(job)}
+                  className="flex items-center gap-3 p-3 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10 hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  <div className="relative flex-shrink-0">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden">
+                      <JobImage
+                        job={job}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-medium text-sm truncate">
+                      {job.title}
+                    </h3>
+                    <p className="text-white/60 text-xs truncate">
+                      {job.company}
+                    </p>
+                    <p className="text-white/40 text-xs truncate">
+                      {job.city || job.direction}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-[#FBB581] text-xs font-medium">
+                      ${job.salary?.toLocaleString() || 'No especificado'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
-
-        {/* Filtros de tipo de búsqueda */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <button
-            onClick={() => setSearchType('all')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-              searchType === 'all'
-                ? 'bg-[#FBB581] text-black'
-                : 'bg-white/10 text-white/70 hover:bg-white/20'
-            }`}
-          >
-            Todo
-          </button>
-          <button
-            onClick={() => setSearchType('name')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1 ${
-              searchType === 'name'
-                ? 'bg-[#FBB581] text-black'
-                : 'bg-white/10 text-white/70 hover:bg-white/20'
-            }`}
-          >
-            <FaUser className="text-xs" />
-            Nombre
-          </button>
-          <button
-            onClick={() => setSearchType('city')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1 ${
-              searchType === 'city'
-                ? 'bg-[#FBB581] text-black'
-                : 'bg-white/10 text-white/70 hover:bg-white/20'
-            }`}
-          >
-            <FaMapMarkerAlt className="text-xs" />
-            Ciudad
-          </button>
-          <button
-            onClick={() => setSearchType('tags')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1 ${
-              searchType === 'tags'
-                ? 'bg-[#FBB581] text-black'
-                : 'bg-white/10 text-white/70 hover:bg-white/20'
-            }`}
-          >
-            <FaHashtag className="text-xs" />
-            Tags
-          </button>
-        </div>
       </div>
 
-      {/* Resultados */}
-      <div className="flex-1 overflow-y-auto">
-        {!searchTerm.trim() ? (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <FaSearch className="text-white/30 text-4xl mb-4" />
-            <h3 className="text-white/60 text-lg font-medium mb-2">
-              Busca empleos
-            </h3>
-            <p className="text-white/40 text-sm">
-              Escribe para buscar por nombre, ciudad o tags
-            </p>
-          </div>
-        ) : filteredJobs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <FaSearch className="text-white/30 text-4xl mb-4" />
-            <h3 className="text-white/60 text-lg font-medium mb-2">
-              Sin resultados
-            </h3>
-            <p className="text-white/40 text-sm">
-              No se encontraron empleos que coincidan con tu búsqueda
-            </p>
-          </div>
-        ) : (
-          <div className="p-4 space-y-3">
-            <p className="text-white/60 text-sm mb-4">
-              {filteredJobs.length} resultado{filteredJobs.length !== 1 ? 's' : ''} encontrado{filteredJobs.length !== 1 ? 's' : ''}
-            </p>
-            {filteredJobs.map((job) => (
-              <div
-                key={job.id}
-                onClick={() => handleJobSelect(job)}
-                className="flex items-center gap-3 p-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all cursor-pointer"
-              >
-                {/* Image Container */}
-                <div className="relative flex-shrink-0">
-                  <div className="w-14 h-14 rounded-lg overflow-hidden">
-                    <JobImage
-                      job={job}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-
-                {/* Job Info */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-medium text-sm truncate">
-                    {job.title}
-                  </h3>
-                  <p className="text-white/70 text-xs truncate">
-                    {job.company}
-                  </p>
-                  {job.city && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <FaMapMarkerAlt className="text-white/40 text-xs" />
-                      <span className="text-white/60 text-xs">{job.city}</span>
-                    </div>
-                  )}
-                  {job.tags && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {processTags(job.tags).slice(0, 2).map((tag, index) => (
-                        <span
-                          key={index}
-                          className="px-1.5 py-0.5 bg-[#FBB581]/20 text-[#FBB581] text-xs rounded"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                      {processTags(job.tags).length > 2 && (
-                        <span className="text-white/40 text-xs">
-                          +{processTags(job.tags).length - 2}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Bookmark indicator */}
-                {bookmarks[job.id] && (
-                  <div className="flex-shrink-0">
-                    <div className="w-6 h-6 bg-yellow-400/20 rounded-full flex items-center justify-center">
-                      <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      {/* Modal para mostrar detalles del job */}
+      <JobModal
+        job={selectedJob}
+        isOpen={!!selectedJob}
+        onClose={() => setSelectedJob(null)}
+        bookmarks={bookmarks}
+        bookmarkAnimations={bookmarkAnimations}
+        showContactOptions={showContactOptions}
+        onToggleBookmark={onToggleBookmark}
+        onToggleContactOptions={onToggleContactOptions}
+        onOpenMapWithLocation={onOpenMapWithLocation}
+        hasValidLocation={hasValidLocation}
+        onEmailContact={onEmailContact}
+        onWhatsAppContact={onWhatsAppContact}
+        onWebsiteContact={onWebsiteContact}
+        onEditJob={onEditJob}
+        onDeleteJob={onDeleteJob}
+        onViewProfile={onViewProfile}
+        onShareJob={onShareJob}
+        processTags={processTags}
+      />
+    </>
   );
 };
 

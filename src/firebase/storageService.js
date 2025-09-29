@@ -35,10 +35,25 @@ export const storageService = {
     try {
       const storageRef = ref(storage, path);
       const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      return downloadURL;
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      return downloadUrl;
     } catch (error) {
       console.error('Error uploading file:', error);
+      throw error;
+    }
+  },
+
+  // Subir archivo de chat
+  async uploadChatFile(file, conversationId) {
+    try {
+      const timestamp = Date.now();
+      const fileName = `${timestamp}_${file.name}`;
+      const folder = file.type.startsWith('image/') ? 'images' : 'files';
+      const path = `chats/${conversationId}/${folder}/${fileName}`;
+
+      return await this.uploadFile(file, path);
+    } catch (error) {
+      console.error('Error uploading chat file:', error);
       throw error;
     }
   }

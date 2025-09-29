@@ -112,6 +112,7 @@ html, body {
   font-family: system-ui, -apple-system, sans-serif;
   overflow: hidden;
   background: black;
+  color: white;
 }
 
 :root {
@@ -235,4 +236,8 @@ html, body {
 
 .ultra-thin-scrollbar::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+.message-input-no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

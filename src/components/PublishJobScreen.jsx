@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { FaBriefcase, FaBuilding, FaMapMarkerAlt, FaDollarSign, FaImage, FaSpinner, FaExclamationTriangle, FaEnvelope, FaPhone, FaGlobe, FaTags, FaUsers, FaFileAlt, FaCrosshairs, FaTimes, FaUser, FaClipboardList, FaMapSigns } from 'react-icons/fa';
+import { FaAngleDown, FaChevronDown, FaPlus, FaBriefcase, FaBuilding, FaMapMarkerAlt, FaDollarSign, FaImage, FaSpinner, FaExclamationTriangle, FaEnvelope, FaPhone, FaGlobe, FaTags, FaUsers, FaFileAlt, FaCrosshairs, FaTimes, FaUser, FaClipboardList, FaMapSigns } from 'react-icons/fa';
 import { jobsService } from '../firebase/services';
 import { storageService } from '../firebase/storageService';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
@@ -24,6 +24,7 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
   const [showLocationMap, setShowLocationMap] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
+  const [showAllFields, setShowAllFields] = useState(false);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -306,309 +307,333 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
   };
 
   return (
-    <div className="w-screen h-screen bg-black overflow-hidden relative flex items-center justify-center">
-      <div className="fixed w-full h-full flex items-center justify-center px-3">
-        <div className="relative w-full max-w-sm max-h-[95vh] overflow-y-auto">
-          
-          {/* Header */}
-          <div className="text-center mb-4">
-            <FaBriefcase className="w-12 h-12 mx-auto mb-2 text-[#FBB581]" />
-            <h2 className="text-white text-lg font-semibold">
-              {editingJob ? 'Editar Empleo' : 'Publicar Empleo'}
-            </h2>
-            <p className="text-white/60 text-xs">
-              {editingJob ? 'Modifica la información del puesto' : 'Completa la información del puesto'}
-            </p>
-          </div>
-
-          {/* Formulario */}
-          <div className="relative bg-white/10 backdrop-blur-sm rounded-lg p-3 shadow-2xl border border-white/20">
+<div className="fixed inset-0 bg-black overflow-hidden py-0 md:py-0 md:pl-50">
+      <div className="h-full overflow-y-auto">
+        <div className="min-h-full flex justify-center py-0 ">
+          <div className="w-full ">
             
-            {/* Mensaje de error */}
-            {error && (
-              <div className="mb-3 p-2 bg-[#FF4438]/20 border border-[#FF4438]/30 rounded-md flex items-center space-x-2">
-                <FaExclamationTriangle className="text-[#FF4438] text-xs flex-shrink-0" />
-                <span className="text-[#FF4438] text-xs leading-relaxed">{error}</span>
-              </div>
-            )}
+            {/* Header */}
+        <div className="flex items-center justify-between p-3  border-b border-white/10">
+          <div className="flex items-center gap-2 px-4">
+            <FaBriefcase className="text-orange-300 text-sm" />
+            <h1 className="text-white text-lg font-semibold">Publicar</h1>
+          </div>
+          
+          <button
+            onClick={onClose}
+            className="text-white/60 hover:text-white transition-colors p-1"
+          >
+            <FaTimes className="text-lg" />
+          </button>
+        </div>
 
-            <form onSubmit={handleSubmit} className="space-y-2">
+            {/* Formulario */}
+            <div className=" shadow-2xl mb-6 py-4 p-4">
               
-              {/* Imagen */}
-              <div className="space-y-1">
-                <label className="text-white/70 text-xs font-medium">Imagen del empleo (opcional)</label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                    id="image-upload"
-                  />
-                  <label
-                    htmlFor="image-upload"
-                    className="w-full h-24 border-2 border-dashed border-white/30 rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-[#FBB581] transition-colors"
-                  >
-                    {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover rounded-md" />
-                    ) : (
-                      <>
-                        <FaImage className="text-white/50 text-lg mb-1" />
-                        <span className="text-white/70 text-xs text-center">Seleccionar imagen</span>
-                      </>
-                    )}
-                  </label>
+              {/* Mensaje de error */}
+              {error && (
+                <div className="mb-4 p-3 bg-[#FF4438]/20 border border-[#FF4438]/30 rounded-md flex items-center space-x-2">
+                  <FaExclamationTriangle className="text-[#FF4438] text-sm flex-shrink-0" />
+                  <span className="text-[#FF4438] text-sm leading-relaxed">{error}</span>
                 </div>
-              </div>
+              )}
 
-              {/* Título */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaBriefcase className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="text"
-                  name="title"
-                  placeholder="Título del empleo"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                  required
-                />
-              </div>
-
-              {/* Empresa */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaBuilding className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="text"
-                  name="company"
-                  placeholder="Empresa"
-                  value={formData.company}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                  required
-                />
-              </div>
-
-              {/* Puesto */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaUser className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="text"
-                  name="position"
-                  placeholder="Puesto"
-                  value={formData.position}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                  required
-                />
-              </div>
-
-              {/* Descripción */}
-              <div className="relative">
-                <div className="absolute left-2 top-3 z-10">
-                  <FaFileAlt className="text-white/70 text-xs" />
-                </div>
-                <textarea
-                  name="description"
-                  placeholder="Descripción del empleo"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  rows="2"
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200 resize-none"
-                  required
-                />
-              </div>
-
-              {/* Requerimientos */}
-              <div className="relative">
-                <div className="absolute left-2 top-3 z-10">
-                  <FaClipboardList className="text-white/70 text-xs" />
-                </div>
-                <textarea
-                  name="requeriments"
-                  placeholder="Requerimientos del puesto"
-                  value={formData.requeriments}
-                  onChange={handleInputChange}
-                  rows="2"
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200 resize-none"
-                />
-              </div>
-
-              {/* Ciudad */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaMapMarkerAlt className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="text"
-                  name="city"
-                  placeholder="Ciudad"
-                  value={formData.city}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                />
-              </div>
-
-              {/* Dirección */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaMapSigns className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="text"
-                  name="direction"
-                  placeholder="Dirección (calle, número, referencias)"
-                  value={formData.direction}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                />
-              </div>
-
-              {/* Rango Salarial */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaDollarSign className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="text"
-                  name="salary_range"
-                  placeholder="Rango salarial (ej: 2.000.000 - 3.000.000 Gs)"
-                  value={formData.salary_range}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                />
-              </div>
-
-              {/* Vacantes */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaUsers className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="number"
-                  name="vacancies"
-                  placeholder="Número de vacantes"
-                  value={formData.vacancies}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                />
-              </div>
-
-              {/* Tags */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaTags className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="text"
-                  name="tags"
-                  placeholder="Tags: remoto, tiempo completo, etc."
-                  value={formData.tags}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                />
-              </div>
-
-              {/* Email */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaEnvelope className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="Email de contacto"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                  required
-                />
-              </div>
-
-              {/* Teléfono */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaPhone className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="tel"
-                  name="phoneNumber"
-                  placeholder="Teléfono"
-                  value={formData.phoneNumber}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                />
-              </div>
-
-              {/* Website */}
-              <div className="relative">
-                <div className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10">
-                  <FaGlobe className="text-white/70 text-xs" />
-                </div>
-                <input
-                  type="text"
-                  name="website"
-                  placeholder="Website (opcional)"
-                  value={formData.website}
-                  onChange={handleInputChange}
-                  className="w-full pl-7 pr-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs placeholder-white/70 focus:outline-none focus:ring-1 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                />
-              </div>
-
-              {/* Ubicación en el mapa */}
-              <div className="space-y-1">
-                <label className="text-white/70 text-xs font-medium">Ubicación en el mapa</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowLocationMap(true)}
-                    className="flex-1 px-2 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-xs hover:bg-white/20 transition-all duration-200 flex items-center justify-center gap-2"
-                  >
-                    <FaMapMarkerAlt className="text-xs" />
-                    {selectedLocation ? 'Ubicación seleccionada' : 'Seleccionar ubicación'}
-                  </button>
-                  {selectedLocation && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedLocation(null)}
-                      className="px-2 py-2 bg-[#FF4438]/20 border border-[#FF4438]/30 rounded-md text-[#FF4438] text-xs hover:bg-[#FF4438]/30 transition-all duration-200"
+              <form id="job-form" onSubmit={handleSubmit} className="space-y-4">
+                
+                {/* Imagen - Siempre visible */}
+                <div className="space-y-2">
+                  <label className="text-white/70 text-sm font-medium">Imagen del empleo (opcional)</label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                      id="image-upload"
+                    />
+                    <label
+                      htmlFor="image-upload"
+                      className="w-full h-40 border-2 border-dashed border-white/30 rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-[#FBB581] transition-colors"
                     >
-                      <FaTimes className="text-xs" />
-                    </button>
-                  )}
-                </div>
-                {selectedLocation && (
-                  <div className="text-xs text-white/60 mt-1">
-                    Lat: {selectedLocation.lat.toFixed(6)}, Lng: {selectedLocation.lng.toFixed(6)}
+                      {imagePreview ? (
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover rounded-md" />
+                      ) : (
+                        <>
+                          <FaImage className="text-white/50 text-lg mb-1" />
+                          <span className="text-white/70 text-xs text-center">Seleccionar imagen</span>
+                        </>
+                      )}
+                    </label>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Botones */}
-              <div className="fixed top-0 flex space-x-2 pt-3">
+                {/* Título - Siempre visible */}
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                    <FaBriefcase className="text-white/70 text-sm" />
+                  </div>
+                  <input
+                    type="text"
+                    name="title"
+                    placeholder="Título del empleo"
+                    value={formData.title}
+                    onChange={handleInputChange}
+                    className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                    required
+                  />
+                </div>
+
+                {/* Botón desplegable */}
                 <button
                   type="button"
-                  onClick={onClose}
-                  className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-3 rounded-md transition-all duration-200 text-xs"
+                  onClick={() => setShowAllFields(!showAllFields)}
+                  className="w-full flex items-center justify-between px-3 py-3 bg-transparent text-white text-sm transition-all duration-200"
                 >
-                  Cancelar
+                  <span className="flex items-center gap-2">
+                    {/* <FaPlus className="text-sm" /> */}
+                    Información adicional
+                  </span>
+                  <div className={`transform transition-transform duration-200 ${showAllFields ? 'rotate-180' : ''}`}>
+                    <FaAngleDown className="text-sm" />
+                  </div>
                 </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-gradient-to-r from-[#FBB581] to-[#673AB7] hover:from-[#FBB581] hover:to-purple-500/80 text-white font-medium py-2 px-3 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-xs transform hover:scale-[1.02]"
-                >
-                  {loading && <FaSpinner className="animate-spin mr-2 text-xs" />}
-                  <span>{loading ? (editingJob ? 'Actualizando...' : 'Publicando...') : (editingJob ? 'Actualizar' : 'Publicar')}</span>
-                </button>
-              </div>
-            </form>
+
+                {/* TODOS los demás campos - Ocultos por defecto */}
+                {showAllFields && (
+                  <div className="space-y-4">
+                    
+                    {/* Empresa */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                        <FaBuilding className="text-white/70 text-sm" />
+                      </div>
+                      <input
+                        type="text"
+                        name="company"
+                        placeholder="Empresa"
+                        value={formData.company}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                      />
+                    </div>
+
+                    {/* Puesto */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                        <FaUser className="text-white/70 text-sm" />
+                      </div>
+                      <input
+                        type="text"
+                        name="position"
+                        placeholder="Puesto"
+                        value={formData.position}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                      />
+                    </div>
+
+                    {/* Descripción */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-4 z-10">
+                        <FaFileAlt className="text-white/70 text-sm" />
+                      </div>
+                      <textarea
+                        name="description"
+                        placeholder="Descripción del empleo"
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        rows="3"
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200 resize-none"
+                      />
+                    </div>
+
+                    {/* Requerimientos */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-4 z-10">
+                        <FaClipboardList className="text-white/70 text-sm" />
+                      </div>
+                      <textarea
+                        name="requeriments"
+                        placeholder="Requerimientos del puesto"
+                        value={formData.requeriments}
+                        onChange={handleInputChange}
+                        rows="3"
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200 resize-none"
+                      />
+                    </div>
+
+                                        {/* Ubicación en el mapa */}
+                    <div className="space-y-2">
+              
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowLocationMap(true)}
+                          className="flex-1 px-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm hover:bg-white/20 transition-all duration-200 flex items-center justify-center gap-2"
+                        >
+                          <FaMapMarkerAlt className="text-sm" />
+                          {selectedLocation ? 'Ubicación seleccionada' : 'Seleccionar ubicación'}
+                        </button>
+                        {selectedLocation && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedLocation(null)}
+                            className="px-3 py-3 bg-[#FF4438]/20 border border-[#FF4438]/30 rounded-md text-[#FF4438] text-sm hover:bg-[#FF4438]/30 transition-all duration-200"
+                          >
+                            <FaTimes className="text-sm" />
+                          </button>
+                        )}
+                      </div>
+                      {selectedLocation && (
+                        <div className="text-sm text-white/60 mt-2">
+                          Lat: {selectedLocation.lat.toFixed(6)}, Lng: {selectedLocation.lng.toFixed(6)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ciudad */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                        <FaMapMarkerAlt className="text-white/70 text-sm" />
+                      </div>
+                      <input
+                        type="text"
+                        name="city"
+                        placeholder="Ciudad"
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                      />
+                    </div>
+
+                    {/* Dirección */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                        <FaMapSigns className="text-white/70 text-sm" />
+                      </div>
+                      <input
+                        type="text"
+                        name="direction"
+                        placeholder="Dirección (calle, número, referencias)"
+                        value={formData.direction}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                      />
+                    </div>
+
+                    {/* Rango Salarial */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                        <FaDollarSign className="text-white/70 text-sm" />
+                      </div>
+                      <input
+                        type="text"
+                        name="salary_range"
+                        placeholder="Rango salarial (ej: 2.000.000 - 3.000.000 Gs)"
+                        value={formData.salary_range}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                      />
+                    </div>
+
+                    {/* Vacantes */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                        <FaUsers className="text-white/70 text-sm" />
+                      </div>
+                      <input
+                        type="number"
+                        name="vacancies"
+                        placeholder="Número de vacantes"
+                        value={formData.vacancies}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                      />
+                    </div>
+
+                    {/* Tags */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                        <FaTags className="text-white/70 text-sm" />
+                      </div>
+                      <input
+                        type="text"
+                        name="tags"
+                        placeholder="Tags: remoto, tiempo completo, etc."
+                        value={formData.tags}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                      />
+                    </div>
+
+                    {/* Email */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                        <FaEnvelope className="text-white/70 text-sm" />
+                      </div>
+                      <input
+                        type="email"
+                        name="email"
+                        placeholder="Email de contacto"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                      />
+                    </div>
+
+                    {/* Teléfono */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                        <FaPhone className="text-white/70 text-sm" />
+                      </div>
+                      <input
+                        type="tel"
+                        name="phoneNumber"
+                        placeholder="Teléfono"
+                        value={formData.phoneNumber}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                      />
+                    </div>
+
+                    {/* Website */}
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                        <FaGlobe className="text-white/70 text-sm" />
+                      </div>
+                      <input
+                        type="text"
+                        name="website"
+                        placeholder="Website (opcional)"
+                        value={formData.website}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                      />
+                    </div>
+
+                  </div>
+                )}
+
+                {/* Botones - En el flujo normal */}
+                <div className="flex space-x-3 pt-6">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-4 rounded-md transition-all duration-200 text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 bg-gradient-to-r from-[#FBB581] to-[#673AB7] hover:from-[#FBB581] hover:to-purple-500/80 text-white font-medium py-3 px-4 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm transform hover:scale-[1.02]"
+                  >
+                    {loading && <FaSpinner className="animate-spin mr-2 text-sm" />}
+                    <span>{loading ? (editingJob ? 'Actualizando...' : 'Publicando...') : (editingJob ? 'Actualizar' : 'Publicar')}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </div>
@@ -651,10 +676,10 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
               {/* Botón de ubicación actual */}
               <button
                 onClick={useCurrentLocation}
-                className="absolute top-2 right-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md p-2 text-white hover:bg-white/20 transition-all duration-200 z-[1000]"
+                className="absolute top-2 right-2 bg-white backdrop-blur-sm border border-white/20 rounded-md p-2 text-white hover:bg-purple-100  transition-all duration-200 z-[1000]"
                 title="Usar mi ubicación actual"
               >
-                <FaCrosshairs className="text-sm" />
+                <FaCrosshairs className="text-sm text-black/60" />
               </button>
             </div>
 

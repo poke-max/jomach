@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaUser, FaPhone, FaShare, FaMapMarkerAlt, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaUser, FaPaperPlane, FaShare, FaMapMarkerAlt, FaEdit, FaTrash } from 'react-icons/fa';
 import { FaBookmark as FaBookmarkSolid } from 'react-icons/fa';
 import { FaRegBookmark } from 'react-icons/fa';
 import ContactOptions from './ContactOptions';
@@ -54,7 +54,7 @@ const JobActions = ({
   return (
 
 
-    <div className="absolute md:bottom-4 md:-right-12 right-0 px-2 bottom-18 flex flex-col gap-7 md:gap-5 md:bottom-0 items-center z-60"
+    <div className="absolute md:bottom-4 md:-right-0 right-0 px-2 bottom-18 flex flex-col gap-7 md:gap-5 md:bottom-0 items-center z-60"
 >
       
       {/* Perfil del usuario que publicó */}
@@ -156,7 +156,7 @@ const JobActions = ({
           }}
           className="w-10 h-10 md:w-8 md:h-8 bg-white/5 backdrop-blur-sm rounded-full flex items-center justify-center transition-all duration-200 transform hover:scale-110 shadow-xl"
         >
-          <FaPhone className={`drop-shadow-lg text-2xl md:text-lg ${
+          <FaPaperPlane className={`drop-shadow-lg text-2xl md:text-lg ${
             showContactOptions[job.id] ? 'text-[#00A888]' : 'text-white'
           }`} />
         </button>
