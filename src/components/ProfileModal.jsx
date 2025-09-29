@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import UserAvatar from './UserAvatar';
+import JobImage from './JobImage';
 import { FaTimes, FaEnvelope, FaCalendar, FaBriefcase, FaBookmark, FaPhone, FaSpinner, FaExclamationTriangle, FaSms, FaCheck, FaPencilAlt, FaEdit, FaTrash, FaMapMarkerAlt, FaUser, FaFilePdf, FaUpload } from 'react-icons/fa';
 import { RecaptchaVerifier, signInWithPhoneNumber, getAuth, updateProfile } from 'firebase/auth';
 import { usersService, jobsService } from '../firebase/services';
@@ -601,43 +602,86 @@ const ProfileModal = ({
                       <FaSpinner className="animate-spin text-[#FBB581] text-xl" />
                     </div>
                   ) : publishedJobs.length > 0 ? (
-                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                    <div className="space-y-2 max-h-80 overflow-y-auto">
                       {publishedJobs.map((job) => (
-                        <div key={job.id} className="p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer group">
-                          <div className="flex items-start justify-between">
-                            <div
-                              className="flex-1 min-w-0"
-                              onClick={() => onViewJob?.(job)}
-                            >
-                              <h4 className="text-white text-sm font-medium truncate group-hover:text-[#FBB581] transition-colors">{job.title}</h4>
-                              <p className="text-white/60 text-sm">{job.company}</p>
-                              <p className="text-white/40 text-xs">{formatDate(job.createdAt?.toDate?.())}</p>
+                        <div
+                          key={job.id}
+                          className="flex items-center gap-3 p-3 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10 hover:bg-white/10 transition-all cursor-pointer"
+                          onClick={() => {
+                            console.log('🔍 ProfileModal - Tocando job:', job.id, job.title);
+                            console.log('🔍 ProfileModal - onViewJob function:', onViewJob);
+                            onViewJob?.(job);
+                          }}
+                        >
+                          {/* Image Container with Status Icon */}
+                          <div className="relative flex-shrink-0">
+                            <div className="w-12 h-12 rounded-lg overflow-hidden">
+                              <JobImage
+                                job={job}
+                                className="w-full h-full object-cover"
+                              />
                             </div>
-                            {isOwnProfile && (
-                              <div className="flex gap-2 ml-3">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onEditJob?.(job);
-                                  }}
-                                  className="p-2 text-blue-400 hover:text-blue-300 transition-colors"
-                                  title="Editar"
-                                >
-                                  <FaEdit className="text-sm" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteJob(job.id);
-                                  }}
-                                  className="p-2 text-[#FF4438] hover:text-[#FF4438] transition-colors"
-                                  title="Eliminar"
-                                >
-                                  <FaTrash className="text-sm" />
-                                </button>
-                              </div>
+                            <div className="absolute -top-1 -right-1">
+                              <div className={`w-4 h-4 rounded-full border-2 border-black ${
+                                job.isActive ? 'bg-[#00A888]' : 'bg-[#FF4438]'
+                              } shadow-lg`}></div>
+                            </div>
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-white font-medium text-sm line-clamp-1 mb-1">
+                              {job.title}
+                            </h3>
+                            <p className="text-[#FBB581] text-xs font-medium line-clamp-1 mb-1">
+                              {job.company}
+                            </p>
+                            {job.createdAt && (
+                              <span className="inline-block text-white/70 text-xs drop-shadow-lg flex items-center">
+                                {(() => {
+                                  const date = job.createdAt.seconds
+                                    ? new Date(job.createdAt.seconds * 1000)
+                                    : job.createdAt.toDate?.() || new Date(job.createdAt);
+                                  return date.toLocaleDateString('es-ES', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                  });
+                                })()}
+                              </span>
+                            )}
+                            {(job.city || job.direction) && (
+                              <p className="text-white/60 text-xs line-clamp-1">
+                                {[job.city, job.direction].filter(Boolean).join(', ')}
+                              </p>
                             )}
                           </div>
+
+                          {/* Action Buttons - Solo para el propio perfil */}
+                          {isOwnProfile && (
+                            <div className="flex flex-col gap-1 ml-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditJob?.(job);
+                                }}
+                                className="p-1.5 text-blue-400 hover:text-blue-300 transition-colors"
+                                title="Editar"
+                              >
+                                <FaEdit className="text-xs" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteJob(job.id);
+                                }}
+                                className="p-1.5 text-[#FF4438] hover:text-red-400 transition-colors"
+                                title="Eliminar"
+                              >
+                                <FaTrash className="text-xs" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

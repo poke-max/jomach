@@ -639,7 +639,7 @@ const ChatScreen = ({ onClose, recipientId, recipientName }) => {
         )}
       </div>
     </div>
-  );
+ ); 
 
   return (
     <>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { FaAngleDown, FaChevronDown, FaPlus, FaBriefcase, FaBuilding, FaMapMarkerAlt, FaDollarSign, FaImage, FaSpinner, FaExclamationTriangle, FaEnvelope, FaPhone, FaGlobe, FaTags, FaUsers, FaFileAlt, FaCrosshairs, FaTimes, FaUser, FaClipboardList, FaMapSigns } from 'react-icons/fa';
-import { jobsService } from '../firebase/services';
+import { FaAngleDown, FaChevronDown, FaPlus, FaBriefcase, FaBuilding, FaMapMarkerAlt, FaDollarSign, FaImage, FaSpinner, FaExclamationTriangle, FaEnvelope, FaPhone, FaGlobe, FaTags, FaUsers, FaFileAlt, FaCrosshairs, FaTimes, FaUser, FaClipboardList, FaMapSigns, FaHome, FaBullhorn } from 'react-icons/fa';
+import { jobsService, rentsService, adsService } from '../firebase/services';
 import { storageService } from '../firebase/storageService';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -25,6 +25,7 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [showAllFields, setShowAllFields] = useState(false);
+  const [activeTab, setActiveTab] = useState('Empleo'); // Nueva pestaña activa
   
   const [formData, setFormData] = useState({
     title: '',
@@ -35,7 +36,8 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
     city: '',
     direction: '',
     salary_range: '',
-    type: 'Empleo',
+    price: '', // Para alquileres y publicidad
+    type: activeTab,
     status: 'disponible',
     tags: '',
     email: '',
@@ -43,6 +45,14 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
     website: '',
     vacancies: ''
   });
+
+  // Actualizar tipo cuando cambia la pestaña
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      type: activeTab
+    }));
+  }, [activeTab]);
 
   // Cargar datos si estamos editando
   useEffect(() => {
@@ -56,6 +66,7 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
         city: editingJob.city || '',
         direction: editingJob.direction || '',
         salary_range: editingJob.salary_range || '',
+        price: editingJob.price || '',
         type: editingJob.type || 'Empleo',
         status: editingJob.status || 'disponible',
         tags: editingJob.tags || '',
@@ -71,6 +82,11 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
       
       if (editingJob.url) {
         setImagePreview(editingJob.url);
+      }
+
+      // Establecer la pestaña activa según el tipo del elemento que se está editando
+      if (editingJob.type) {
+        setActiveTab(editingJob.type);
       }
     }
   }, [editingJob]);
@@ -185,13 +201,25 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
       setError('El título es obligatorio');
       return false;
     }
-    if (!formData.company.trim()) {
-      setError('La empresa es obligatoria');
-      return false;
+
+    // Validaciones específicas para empleos
+    if (activeTab === 'Empleo') {
+      if (!formData.company.trim()) {
+        setError('La empresa es obligatoria');
+        return false;
+      }
+      if (!formData.position.trim()) {
+        setError('El puesto es obligatorio');
+        return false;
+      }
     }
-    if (!formData.position.trim()) {
-      setError('El puesto es obligatorio');
-      return false;
+
+    // Validaciones específicas para alquileres
+    if (activeTab === 'Alquiler') {
+      if (!formData.price.trim()) {
+        setError('El precio es obligatorio para alquileres');
+        return false;
+      }
     }
     if (!formData.description.trim()) {
       setError('La descripción es obligatoria');
@@ -231,36 +259,64 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
       
       // Subir imagen si existe una nueva
       if (imageFile) {
-        const fileName = `jobs/${Date.now()}_${formData.title.replace(/\s+/g, '_')}.webp`;
+        const folderName = activeTab === 'Empleo' ? 'jobs' : activeTab === 'Alquiler' ? 'rents' : 'ads';
+        const fileName = `${folderName}/${Date.now()}_${formData.title.replace(/\s+/g, '_')}.webp`;
         imageUrl = await storageService.uploadFile(imageFile, fileName);
       }
 
-      // Crear objeto del empleo
-      const jobData = {
+      // Crear objeto de datos
+      const publicationData = {
         ...formData,
         url: imageUrl,
         ubication: selectedLocation || null
       };
 
-      let jobId = null;
+      let publicationId = null;
+
+      // Seleccionar servicio según el tipo
+      const getService = () => {
+        switch (activeTab) {
+          case 'Alquiler':
+            return rentsService;
+          case 'Publicidad':
+            return adsService;
+          default:
+            return jobsService;
+        }
+      };
+
+      const service = getService();
+      const typeName = activeTab === 'Empleo' ? 'empleo' : activeTab === 'Alquiler' ? 'alquiler' : 'anuncio';
 
       if (editingJob) {
-        // Actualizar empleo existente
-        await jobsService.updateJob(editingJob.id, jobData, currentUser.uid);
-        console.log('Empleo actualizado con ID:', editingJob.id);
-        jobId = editingJob.id;
+        // Actualizar publicación existente
+        if (activeTab === 'Empleo') {
+          await service.updateJob(editingJob.id, publicationData, currentUser.uid);
+        } else if (activeTab === 'Alquiler') {
+          await service.updateRent(editingJob.id, publicationData, currentUser.uid);
+        } else {
+          await service.updateAd(editingJob.id, publicationData, currentUser.uid);
+        }
+        console.log(`${typeName} actualizado con ID:`, editingJob.id);
+        publicationId = editingJob.id;
       } else {
-        // Crear nuevo empleo
-        jobData.createdBy = currentUser.uid;
-        jobData.createdAt = new Date();
-        jobData.updatedAt = new Date();
+        // Crear nueva publicación
+        publicationData.createdBy = currentUser.uid;
+        publicationData.createdAt = new Date();
+        publicationData.updatedAt = new Date();
 
-        jobId = await jobsService.addJob(jobData);
-        console.log('Empleo publicado con ID:', jobId);
+        if (activeTab === 'Empleo') {
+          publicationId = await service.addJob(publicationData);
+        } else if (activeTab === 'Alquiler') {
+          publicationId = await service.addRent(publicationData);
+        } else {
+          publicationId = await service.addAd(publicationData);
+        }
+        console.log(`${typeName} publicado con ID:`, publicationId);
       }
 
       if (onJobPublished) {
-        onJobPublished(jobId);
+        onJobPublished(publicationId);
       }
       
       if (onClose) {
@@ -268,8 +324,9 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
       }
 
     } catch (error) {
-      console.error('Error al guardar empleo:', error);
-      setError(error.message || 'Error al guardar el empleo. Inténtalo de nuevo.');
+      const typeName = activeTab === 'Empleo' ? 'empleo' : activeTab === 'Alquiler' ? 'alquiler' : 'anuncio';
+      console.error(`Error al guardar ${typeName}:`, error);
+      setError(error.message || `Error al guardar el ${typeName}. Inténtalo de nuevo.`);
     } finally {
       setLoading(false);
     }
@@ -307,7 +364,7 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
   };
 
   return (
-<div className="fixed inset-0 bg-black overflow-hidden py-0 md:py-0 md:pl-50">
+<div className="fixed inset-0 bg-black overflow-hidden py-0 md:py-0 md:pl-50 z-[120]">
       <div className="h-full overflow-y-auto">
         <div className="min-h-full flex justify-center py-0 ">
           <div className="w-full ">
@@ -327,6 +384,28 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
           </button>
         </div>
 
+            {/* Pestañas */}
+            <div className="flex border-b border-white/10">
+              {['Empleo', 'Alquiler', 'Publicidad'].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+                    activeTab === tab
+                      ? 'text-orange-300 border-b-2 border-orange-300'
+                      : 'text-white/60 hover:text-white/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    {tab === 'Empleo' && <FaBriefcase />}
+                    {tab === 'Alquiler' && <FaHome />}
+                    {tab === 'Publicidad' && <FaBullhorn />}
+                    {tab}
+                  </div>
+                </button>
+              ))}
+            </div>
+
             {/* Formulario */}
             <div className=" shadow-2xl mb-6 py-4 p-4">
               
@@ -342,7 +421,9 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
                 
                 {/* Imagen - Siempre visible */}
                 <div className="space-y-2">
-                  <label className="text-white/70 text-sm font-medium">Imagen del empleo (opcional)</label>
+                  <label className="text-white/70 text-sm font-medium">
+                    Imagen del {activeTab === 'Empleo' ? 'empleo' : activeTab === 'Alquiler' ? 'alquiler' : 'anuncio'} (opcional)
+                  </label>
                   <div className="relative">
                     <input
                       type="file"
@@ -375,7 +456,7 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
                   <input
                     type="text"
                     name="title"
-                    placeholder="Título del empleo"
+                    placeholder={`Título del ${activeTab === 'Empleo' ? 'empleo' : activeTab === 'Alquiler' ? 'alquiler' : 'anuncio'}`}
                     value={formData.title}
                     onChange={handleInputChange}
                     className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
@@ -401,36 +482,40 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
                 {/* TODOS los demás campos - Ocultos por defecto */}
                 {showAllFields && (
                   <div className="space-y-4">
-                    
-                    {/* Empresa */}
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
-                        <FaBuilding className="text-white/70 text-sm" />
-                      </div>
-                      <input
-                        type="text"
-                        name="company"
-                        placeholder="Empresa"
-                        value={formData.company}
-                        onChange={handleInputChange}
-                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                      />
-                    </div>
 
-                    {/* Puesto */}
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
-                        <FaUser className="text-white/70 text-sm" />
+                    {/* Empresa - Solo para empleos */}
+                    {activeTab === 'Empleo' && (
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                          <FaBuilding className="text-white/70 text-sm" />
+                        </div>
+                        <input
+                          type="text"
+                          name="company"
+                          placeholder="Empresa"
+                          value={formData.company}
+                          onChange={handleInputChange}
+                          className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                        />
                       </div>
-                      <input
-                        type="text"
-                        name="position"
-                        placeholder="Puesto"
-                        value={formData.position}
-                        onChange={handleInputChange}
-                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                      />
-                    </div>
+                    )}
+
+                    {/* Puesto - Solo para empleos */}
+                    {activeTab === 'Empleo' && (
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                          <FaUser className="text-white/70 text-sm" />
+                        </div>
+                        <input
+                          type="text"
+                          name="position"
+                          placeholder="Puesto"
+                          value={formData.position}
+                          onChange={handleInputChange}
+                          className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                        />
+                      </div>
+                    )}
 
                     {/* Descripción */}
                     <div className="relative">
@@ -447,20 +532,22 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
                       />
                     </div>
 
-                    {/* Requerimientos */}
-                    <div className="relative">
-                      <div className="absolute left-3 top-4 z-10">
-                        <FaClipboardList className="text-white/70 text-sm" />
+                    {/* Requerimientos - Solo para empleos */}
+                    {activeTab === 'Empleo' && (
+                      <div className="relative">
+                        <div className="absolute left-3 top-4 z-10">
+                          <FaClipboardList className="text-white/70 text-sm" />
+                        </div>
+                        <textarea
+                          name="requeriments"
+                          placeholder="Requerimientos del puesto"
+                          value={formData.requeriments}
+                          onChange={handleInputChange}
+                          rows="3"
+                          className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200 resize-none"
+                        />
                       </div>
-                      <textarea
-                        name="requeriments"
-                        placeholder="Requerimientos del puesto"
-                        value={formData.requeriments}
-                        onChange={handleInputChange}
-                        rows="3"
-                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200 resize-none"
-                      />
-                    </div>
+                    )}
 
                                         {/* Ubicación en el mapa */}
                     <div className="space-y-2">
@@ -521,20 +608,39 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
                       />
                     </div>
 
-                    {/* Rango Salarial */}
-                    <div className="relative">
-                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
-                        <FaDollarSign className="text-white/70 text-sm" />
+                    {/* Rango salarial - Solo para empleos */}
+                    {activeTab === 'Empleo' && (
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                          <FaDollarSign className="text-white/70 text-sm" />
+                        </div>
+                        <input
+                          type="text"
+                          name="salary_range"
+                          placeholder="Rango salarial (ej: 2.000.000 - 3.000.000 Gs)"
+                          value={formData.salary_range}
+                          onChange={handleInputChange}
+                          className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                        />
                       </div>
-                      <input
-                        type="text"
-                        name="salary_range"
-                        placeholder="Rango salarial (ej: 2.000.000 - 3.000.000 Gs)"
-                        value={formData.salary_range}
-                        onChange={handleInputChange}
-                        className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
-                      />
-                    </div>
+                    )}
+
+                    {/* Precio - Para alquileres y publicidad */}
+                    {(activeTab === 'Alquiler' || activeTab === 'Publicidad') && (
+                      <div className="relative">
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10">
+                          <FaDollarSign className="text-white/70 text-sm" />
+                        </div>
+                        <input
+                          type="text"
+                          name="price"
+                          placeholder={activeTab === 'Alquiler' ? 'Precio del alquiler (ej: 2.000.000 - 3.000.000 Gs)' : 'Precio del producto/servicio'}
+                          value={formData.price}
+                          onChange={handleInputChange}
+                          className="w-full pl-10 pr-3 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-md text-white text-sm placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-[#FBB581] focus:border-[#FBB581] transition-all duration-200"
+                        />
+                      </div>
+                    )}
 
                     {/* Vacantes */}
                     <div className="relative">
@@ -629,7 +735,15 @@ const PublishJobScreen = ({ onClose, onJobPublished, editingJob = null }) => {
                     className="flex-1 bg-gradient-to-r from-[#FBB581] to-[#673AB7] hover:from-[#FBB581] hover:to-purple-500/80 text-white font-medium py-3 px-4 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm transform hover:scale-[1.02]"
                   >
                     {loading && <FaSpinner className="animate-spin mr-2 text-sm" />}
-                    <span>{loading ? (editingJob ? 'Actualizando...' : 'Publicando...') : (editingJob ? 'Actualizar' : 'Publicar')}</span>
+                    <span>
+                      {loading
+                        ? (editingJob ? 'Actualizando...' : 'Publicando...')
+                        : (editingJob
+                          ? 'Actualizar'
+                          : `Publicar ${activeTab === 'Empleo' ? 'Empleo' : activeTab === 'Alquiler' ? 'Alquiler' : 'Anuncio'}`
+                        )
+                      }
+                    </span>
                   </button>
                 </div>
               </form>

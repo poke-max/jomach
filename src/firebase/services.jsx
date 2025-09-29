@@ -26,22 +26,28 @@ export const jobsService = {
   // Obtener empleos en tiempo real
   subscribeToJobs(callback, filters = {}) {
     const jobsRef = collection(db, 'jobs');
-    
-    // Consulta más simple posible - obtener TODOS los documentos
+
     console.log('Starting jobs subscription...');
-    
+
     return onSnapshot(jobsRef, (snapshot) => {
       console.log('Snapshot received, total docs:', snapshot.docs.length);
       console.log('Snapshot empty?', snapshot.empty);
-      
+
       const jobs = snapshot.docs.map(doc => {
         const data = { id: doc.id, ...doc.data() };
         console.log('Document found:', doc.id, data);
         return data;
       });
-      
-      console.log('Final jobs array:', jobs);
-      callback(jobs);
+
+      // Ordenar empleos de más reciente a más viejo
+      const sortedJobs = jobs.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(0);
+        const dateB = b.createdAt?.toDate?.() || new Date(0);
+        return dateB - dateA; // Más reciente primero
+      });
+
+      console.log('Final sorted jobs array:', sortedJobs);
+      callback(sortedJobs);
     }, (error) => {
       console.error('Error listening to jobs:', error);
       callback([]);
@@ -646,6 +652,448 @@ export const messagesService = {
 
 };
 
+// Servicio para alquileres
+export const rentsService = {
+  // Obtener alquileres en tiempo real
+  subscribeToRents(callback, filters = {}) {
+    const rentsRef = collection(db, 'rents');
+
+    console.log('Starting rents subscription...');
+
+    return onSnapshot(rentsRef, (snapshot) => {
+      console.log('Rents snapshot received, total docs:', snapshot.docs.length);
+      console.log('Rents snapshot empty?', snapshot.empty);
+
+      const rents = snapshot.docs.map(doc => {
+        const data = { id: doc.id, ...doc.data() };
+        console.log('Rent document found:', doc.id, data);
+        return data;
+      });
+
+      // Ordenar alquileres de más reciente a más viejo
+      const sortedRents = rents.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(0);
+        const dateB = b.createdAt?.toDate?.() || new Date(0);
+        return dateB - dateA; // Más reciente primero
+      });
+
+      console.log('Final sorted rents array:', sortedRents);
+      callback(sortedRents);
+    }, (error) => {
+      console.error('Error listening to rents:', error);
+      callback([]);
+    });
+  },
+
+  // Obtener alquiler por ID
+  async getRentById(rentId) {
+    try {
+      const rentRef = doc(db, 'rents', rentId);
+      const rentDoc = await getDoc(rentRef);
+
+      if (rentDoc.exists()) {
+        return { id: rentDoc.id, ...rentDoc.data() };
+      } else {
+        throw new Error('El alquiler no existe');
+      }
+    } catch (error) {
+      console.error('Error getting rent:', error);
+      throw error;
+    }
+  },
+
+  // Agregar nuevo alquiler
+  async addRent(rentData) {
+    try {
+      const rentsRef = collection(db, 'rents');
+      const docRef = await addDoc(rentsRef, {
+        ...rentData,
+        likes: 0,
+        views: 0,
+        isActive: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      // Agregar el ID del alquiler a las publicaciones del usuario
+      const userRef = doc(db, 'users', rentData.createdBy);
+      await updateDoc(userRef, {
+        publishedRents: arrayUnion(docRef.id),
+        updatedAt: serverTimestamp()
+      });
+
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding rent:', error);
+      throw error;
+    }
+  },
+
+  // Actualizar alquiler existente
+  async updateRent(rentId, rentData, userId) {
+    try {
+      const rentRef = doc(db, 'rents', rentId);
+      const rentDoc = await getDoc(rentRef);
+
+      if (!rentDoc.exists()) {
+        throw new Error('El alquiler no existe');
+      }
+
+      // Verificar que el usuario sea el creador
+      if (rentDoc.data().createdBy !== userId) {
+        throw new Error('No tienes permisos para editar este alquiler');
+      }
+
+      await updateDoc(rentRef, {
+        ...rentData,
+        updatedAt: serverTimestamp()
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error updating rent:', error);
+      throw error;
+    }
+  },
+
+  // Eliminar alquiler
+  async deleteRent(rentId, userId) {
+    try {
+      const rentRef = doc(db, 'rents', rentId);
+      const rentDoc = await getDoc(rentRef);
+
+      if (!rentDoc.exists()) {
+        throw new Error('El alquiler no existe');
+      }
+
+      // Verificar que el usuario sea el creador
+      if (rentDoc.data().createdBy !== userId) {
+        throw new Error('No tienes permisos para eliminar este alquiler');
+      }
+
+      await deleteDoc(rentRef);
+
+      // Remover el ID del alquiler de las publicaciones del usuario
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        publishedRents: arrayRemove(rentId),
+        updatedAt: serverTimestamp()
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting rent:', error);
+      throw error;
+    }
+  },
+
+  // Dar like a alquiler
+  async likeRent(rentId, userId) {
+    try {
+      const rentRef = doc(db, 'rents', rentId);
+      const userRef = doc(db, 'users', userId);
+
+      await updateDoc(rentRef, {
+        likes: increment(1),
+        updatedAt: serverTimestamp()
+      });
+
+      await updateDoc(userRef, {
+        likedRents: arrayUnion(rentId),
+        updatedAt: serverTimestamp()
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error liking rent:', error);
+      throw error;
+    }
+  },
+
+  // Quitar like a alquiler
+  async unlikeRent(rentId, userId) {
+    try {
+      const rentRef = doc(db, 'rents', rentId);
+      const userRef = doc(db, 'users', userId);
+
+      await updateDoc(rentRef, {
+        likes: increment(-1),
+        updatedAt: serverTimestamp()
+      });
+
+      await updateDoc(userRef, {
+        likedRents: arrayRemove(rentId),
+        updatedAt: serverTimestamp()
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error unliking rent:', error);
+      throw error;
+    }
+  },
+
+  // Cambiar estado activo/inactivo del alquiler
+  async toggleRentStatus(rentId, userId) {
+    try {
+      const rentRef = doc(db, 'rents', rentId);
+      const rentDoc = await getDoc(rentRef);
+
+      if (!rentDoc.exists()) {
+        throw new Error('El alquiler no existe');
+      }
+
+      // Verificar que el usuario sea el creador
+      if (rentDoc.data().createdBy !== userId) {
+        throw new Error('No tienes permisos para cambiar el estado de este alquiler');
+      }
+
+      const currentStatus = rentDoc.data().isActive;
+      const newStatus = !currentStatus;
+
+      await updateDoc(rentRef, {
+        isActive: newStatus,
+        updatedAt: serverTimestamp()
+      });
+
+      return newStatus;
+    } catch (error) {
+      console.error('Error toggling rent status:', error);
+      throw error;
+    }
+  }
+};
+
+// Servicio para publicidad
+export const adsService = {
+  // Obtener anuncios en tiempo real
+  subscribeToAds(callback, filters = {}) {
+    const adsRef = collection(db, 'ads');
+
+    console.log('Starting ads subscription...');
+
+    return onSnapshot(adsRef, (snapshot) => {
+      console.log('Ads snapshot received, total docs:', snapshot.docs.length);
+      console.log('Ads snapshot empty?', snapshot.empty);
+
+      const ads = snapshot.docs.map(doc => {
+        const data = { id: doc.id, ...doc.data() };
+        console.log('Ad document found:', doc.id, data);
+        return data;
+      });
+
+      // Ordenar anuncios de más reciente a más viejo
+      const sortedAds = ads.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(0);
+        const dateB = b.createdAt?.toDate?.() || new Date(0);
+        return dateB - dateA; // Más reciente primero
+      });
+
+      console.log('Final sorted ads array:', sortedAds);
+      callback(sortedAds);
+    }, (error) => {
+      console.error('Error listening to ads:', error);
+      callback([]);
+    });
+  },
+
+  // Obtener anuncio por ID
+  async getAdById(adId) {
+    try {
+      const adRef = doc(db, 'ads', adId);
+      const adDoc = await getDoc(adRef);
+
+      if (adDoc.exists()) {
+        return { id: adDoc.id, ...adDoc.data() };
+      } else {
+        throw new Error('El anuncio no existe');
+      }
+    } catch (error) {
+      console.error('Error getting ad:', error);
+      throw error;
+    }
+  },
+
+  // Agregar nuevo anuncio
+  async addAd(adData) {
+    try {
+      const adsRef = collection(db, 'ads');
+      const docRef = await addDoc(adsRef, {
+        ...adData,
+        likes: 0,
+        views: 0,
+        clicks: 0,
+        isActive: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+
+      // Agregar el ID del anuncio a las publicaciones del usuario
+      const userRef = doc(db, 'users', adData.createdBy);
+      await updateDoc(userRef, {
+        publishedAds: arrayUnion(docRef.id),
+        updatedAt: serverTimestamp()
+      });
+
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding ad:', error);
+      throw error;
+    }
+  },
+
+  // Actualizar anuncio existente
+  async updateAd(adId, adData, userId) {
+    try {
+      const adRef = doc(db, 'ads', adId);
+      const adDoc = await getDoc(adRef);
+
+      if (!adDoc.exists()) {
+        throw new Error('El anuncio no existe');
+      }
+
+      // Verificar que el usuario sea el creador
+      if (adDoc.data().createdBy !== userId) {
+        throw new Error('No tienes permisos para editar este anuncio');
+      }
+
+      await updateDoc(adRef, {
+        ...adData,
+        updatedAt: serverTimestamp()
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error updating ad:', error);
+      throw error;
+    }
+  },
+
+  // Eliminar anuncio
+  async deleteAd(adId, userId) {
+    try {
+      const adRef = doc(db, 'ads', adId);
+      const adDoc = await getDoc(adRef);
+
+      if (!adDoc.exists()) {
+        throw new Error('El anuncio no existe');
+      }
+
+      // Verificar que el usuario sea el creador
+      if (adDoc.data().createdBy !== userId) {
+        throw new Error('No tienes permisos para eliminar este anuncio');
+      }
+
+      await deleteDoc(adRef);
+
+      // Remover el ID del anuncio de las publicaciones del usuario
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        publishedAds: arrayRemove(adId),
+        updatedAt: serverTimestamp()
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting ad:', error);
+      throw error;
+    }
+  },
+
+  // Dar like a anuncio
+  async likeAd(adId, userId) {
+    try {
+      const adRef = doc(db, 'ads', adId);
+      const userRef = doc(db, 'users', userId);
+
+      await updateDoc(adRef, {
+        likes: increment(1),
+        updatedAt: serverTimestamp()
+      });
+
+      await updateDoc(userRef, {
+        likedAds: arrayUnion(adId),
+        updatedAt: serverTimestamp()
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error liking ad:', error);
+      throw error;
+    }
+  },
+
+  // Quitar like a anuncio
+  async unlikeAd(adId, userId) {
+    try {
+      const adRef = doc(db, 'ads', adId);
+      const userRef = doc(db, 'users', userId);
+
+      await updateDoc(adRef, {
+        likes: increment(-1),
+        updatedAt: serverTimestamp()
+      });
+
+      await updateDoc(userRef, {
+        likedAds: arrayRemove(adId),
+        updatedAt: serverTimestamp()
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error unliking ad:', error);
+      throw error;
+    }
+  },
+
+  // Registrar click en anuncio
+  async clickAd(adId) {
+    try {
+      const adRef = doc(db, 'ads', adId);
+
+      await updateDoc(adRef, {
+        clicks: increment(1),
+        updatedAt: serverTimestamp()
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error registering ad click:', error);
+      throw error;
+    }
+  },
+
+  // Cambiar estado activo/inactivo del anuncio
+  async toggleAdStatus(adId, userId) {
+    try {
+      const adRef = doc(db, 'ads', adId);
+      const adDoc = await getDoc(adRef);
+
+      if (!adDoc.exists()) {
+        throw new Error('El anuncio no existe');
+      }
+
+      // Verificar que el usuario sea el creador
+      if (adDoc.data().createdBy !== userId) {
+        throw new Error('No tienes permisos para cambiar el estado de este anuncio');
+      }
+
+      const currentStatus = adDoc.data().isActive;
+      const newStatus = !currentStatus;
+
+      await updateDoc(adRef, {
+        isActive: newStatus,
+        updatedAt: serverTimestamp()
+      });
+
+      return newStatus;
+    } catch (error) {
+      console.error('Error toggling ad status:', error);
+      throw error;
+    }
+  }
+};
+
 // Servicio para usuarios
 export const usersService = {
   // Crear/actualizar perfil de usuario
@@ -670,6 +1118,10 @@ export const usersService = {
           savedJobs: [],
           appliedJobs: [],
           publishedJobs: [],
+          likedRents: [],
+          publishedRents: [],
+          likedAds: [],
+          publishedAds: [],
           isActive: true
         });
       }
@@ -742,11 +1194,49 @@ export const usersService = {
       const publishedJobsPromises = userProfile.publishedJobs.map(jobId =>
         jobsService.getJob(jobId)
       );
-      
+
       const publishedJobs = await Promise.all(publishedJobsPromises);
       return publishedJobs.filter(job => job !== null);
     } catch (error) {
       console.error('Error getting published jobs:', error);
+      throw error;
+    }
+  },
+
+  // Obtener alquileres publicados del usuario
+  async getUserPublishedRents(uid) {
+    try {
+      const userProfile = await this.getUserProfile(uid);
+      if (!userProfile?.publishedRents?.length) return [];
+
+      // Obtener detalles de alquileres publicados
+      const publishedRentsPromises = userProfile.publishedRents.map(rentId =>
+        rentsService.getRentById(rentId)
+      );
+
+      const publishedRents = await Promise.all(publishedRentsPromises);
+      return publishedRents.filter(rent => rent !== null);
+    } catch (error) {
+      console.error('Error getting published rents:', error);
+      throw error;
+    }
+  },
+
+  // Obtener anuncios publicados del usuario
+  async getUserPublishedAds(uid) {
+    try {
+      const userProfile = await this.getUserProfile(uid);
+      if (!userProfile?.publishedAds?.length) return [];
+
+      // Obtener detalles de anuncios publicados
+      const publishedAdsPromises = userProfile.publishedAds.map(adId =>
+        adsService.getAdById(adId)
+      );
+
+      const publishedAds = await Promise.all(publishedAdsPromises);
+      return publishedAds.filter(ad => ad !== null);
+    } catch (error) {
+      console.error('Error getting published ads:', error);
       throw error;
     }
   },

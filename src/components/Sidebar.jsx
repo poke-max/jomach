@@ -6,7 +6,7 @@ import UserDropdown from './UserDropdown';
 import ProfileModal from './ProfileModal';
 import { FaHome, FaMap, FaPlus, FaBookmark, FaPlusCircle, FaComments } from 'react-icons/fa';
 
-const Sidebar = ({ onOpenMap, onGoHome, onOpenPublish, onOpenFavorites, onOpenMessages, currentView = 'home' }) => {
+const Sidebar = ({ onOpenMap, onGoHome, onOpenPublish, onOpenFavorites, onOpenMessages, currentView = 'home', onEditJob, onViewJob }) => {
   const { currentUser, userProfile } = useAuth();
   const { unreadCount } = useUnreadMessages();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -371,6 +371,8 @@ const Sidebar = ({ onOpenMap, onGoHome, onOpenPublish, onOpenFavorites, onOpenMe
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         anchorRef={profileButtonRef}
+        onEditJob={onEditJob}
+        onViewJob={onViewJob}
       />
     </>
   );

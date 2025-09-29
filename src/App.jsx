@@ -30,6 +30,12 @@ const App = () => {
   // Estado para búsqueda integrada
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Estado para pull-to-refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
+
   // Función para normalizar texto (copiada de SearchScreen)
   const normalizeText = (text) => {
     if (!text) return '';
@@ -71,6 +77,27 @@ const App = () => {
       })
     : jobs; // Si no hay término de búsqueda, mostrar todos los jobs
 
+  // Función para manejar el refresh
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+
+    setIsRefreshing(true);
+    try {
+      // Simular un pequeño delay para mostrar el loading
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Los jobs se actualizan automáticamente por el listener en tiempo real
+      // No necesitamos hacer nada más, solo mostrar el feedback visual
+      console.log('🔄 Feed actualizado');
+    } catch (error) {
+      console.error('Error al actualizar feed:', error);
+    } finally {
+      setIsRefreshing(false);
+      setPullDistance(0);
+      setIsPulling(false);
+    }
+  };
+
   // Usar hooks personalizados
   const {
     currentIndex,
@@ -79,14 +106,54 @@ const App = () => {
     dragOffset,
     velocity,
     containerRef,
-    handleTouchStart,
-    handleTouchMove,
-    handleTouchEnd,
+    handleTouchStart: originalHandleTouchStart,
+    handleTouchMove: originalHandleTouchMove,
+    handleTouchEnd: originalHandleTouchEnd,
     handleWheel,
     goToNext,
     goToPrev,
     goToIndex
   } = useSmoothJobNavigation(filteredJobs);
+
+  // Handlers personalizados para pull-to-refresh
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    setStartY(touch.clientY);
+    setIsPulling(false);
+    setPullDistance(0);
+    originalHandleTouchStart(e);
+  };
+
+  const handleTouchMove = (e) => {
+    const touch = e.touches[0];
+    const currentY = touch.clientY;
+    const deltaY = currentY - startY;
+
+    // Solo activar pull-to-refresh si estamos en el primer job y arrastrando hacia abajo
+    if (currentIndex === 0 && deltaY > 0 && !isDragging) {
+      setIsPulling(true);
+      const maxPull = 120;
+      const pullDistance = Math.min(deltaY * 0.5, maxPull);
+      setPullDistance(pullDistance);
+
+      // Prevenir el scroll normal cuando estamos haciendo pull-to-refresh
+      e.preventDefault();
+      return;
+    }
+
+    originalHandleTouchMove(e);
+  };
+
+  const handleTouchEnd = (e) => {
+    if (isPulling && pullDistance > 60) {
+      handleRefresh();
+    } else {
+      setPullDistance(0);
+      setIsPulling(false);
+    }
+
+    originalHandleTouchEnd(e);
+  };
 
   const {
     likes,
@@ -200,7 +267,9 @@ Atentamente,
 
   // Función para ver job desde perfil
   const handleViewJobFromProfile = (job) => {
+    console.log('🚀 App.jsx - handleViewJobFromProfile llamada con job:', job.id, job.title);
     setSelectedJobFromProfile(job);
+    console.log('🚀 App.jsx - selectedJobFromProfile actualizado, cerrando ProfileModal');
     setShowProfileModal(false); // Cerrar modal de perfil
   };
 
@@ -492,6 +561,8 @@ Atentamente,
         onOpenFavorites={openFavorites}
         onOpenMessages={openMessages}
         currentView={currentView}
+        onEditJob={handleEditJob}
+        onViewJob={handleViewJobFromProfile}
       />
 
       {/* Debug Panel - Solo en desarrollo */}
@@ -520,6 +591,33 @@ Atentamente,
           perspective: '1000px'
         }}
       >
+        {/* Pull-to-refresh indicator */}
+        {(isPulling || isRefreshing) && currentView === 'home' && (
+          <div
+            className="md:hidden absolute top-0 left-0 right-0 z-40 flex justify-center items-center"
+            style={{
+              paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+              transform: `translateY(${isPulling ? pullDistance - 60 : 0}px)`,
+              opacity: isPulling ? Math.min(pullDistance / 60, 1) : 1
+            }}
+          >
+            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full p-3 shadow-lg">
+              <div
+                className="w-6 h-6 border-2 border-white/30 border-t-[#FBB581] rounded-full"
+                style={{
+                  animation: isRefreshing
+                    ? 'spin 0.8s linear infinite'
+                    : 'none',
+                  transform: isPulling && !isRefreshing
+                    ? `rotate(${Math.min(pullDistance * 6, 360)}deg)`
+                    : 'none',
+                  transition: isPulling ? 'none' : 'transform 0.3s ease-out'
+                }}
+              ></div>
+            </div>
+          </div>
+        )}
+
         {/* Barra de búsqueda móvil - Funcional */}
         {currentView === 'home' && (
           <div className="md:hidden absolute top-0 left-0 right-0 z-50 p-3"
@@ -596,9 +694,9 @@ Atentamente,
           <div
             className="relative w-full h-full"
             style={{
-              transform: `translateY(${(-currentIndex * 100) + (dragOffset / window.innerHeight * 100)}vh)`,
+              transform: `translateY(${(-currentIndex * 100) + (dragOffset / window.innerHeight * 100) + (isPulling && currentIndex === 0 ? pullDistance * 0.3 : 0)}vh)`,
               willChange: 'transform',
-              transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+              transition: isDragging || isPulling ? 'none' : 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
               backfaceVisibility: 'hidden'
             }}
           >
@@ -730,10 +828,14 @@ Atentamente,
       )}
 
       {/* Job Modal desde perfil */}
+      {console.log('🎯 App.jsx - Renderizando JobModal con selectedJobFromProfile:', selectedJobFromProfile)}
       <JobModal
         job={selectedJobFromProfile}
         isOpen={!!selectedJobFromProfile}
-        onClose={() => setSelectedJobFromProfile(null)}
+        onClose={() => {
+          console.log('🎯 App.jsx - Cerrando JobModal desde perfil');
+          setSelectedJobFromProfile(null);
+        }}
         bookmarks={bookmarks}
         bookmarkAnimations={bookmarkAnimations}
         showContactOptions={showContactOptions}

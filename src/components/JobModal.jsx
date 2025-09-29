@@ -50,7 +50,7 @@ const JobModal = ({
   if (!isOpen || !job) return null;
 
   return (
-    <div className="fixed inset-0 bg-black z-[70] overflow-hidden">
+    <div className="fixed inset-0 bg-black z-[100] overflow-hidden">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/80 to-transparent">
         <button
